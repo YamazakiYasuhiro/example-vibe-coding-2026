@@ -144,27 +144,54 @@ None.
 
 ## Step-by-Step Implementation Guide
 
-1. **Add unit tests (Red)**:
+1. **Add unit tests (Red)**: [x]
     *   Create `features/myprog/date_test.go` with the table-driven cases above.
     *   Confirm failure via `./scripts/process/build.sh`（`FormatToday` 未定義でコンパイルまたはテスト失敗）。
 
-2. **Implement FormatToday (Green)**:
+2. **Implement FormatToday (Green)**: [x]
     *   Create `features/myprog/date.go` with `FormatToday` and the `iso` / `slash` / `jp` / empty / default error logic described in Proposed Changes.
     *   Re-run `./scripts/process/build.sh` until unit tests pass.
 
-3. **Wire CLI in main**:
+3. **Wire CLI in main**: [x]
     *   Edit `features/myprog/main.go` to add `flag`, call `FormatToday(time.Now(), *format)`, Fail Fast on error, then print `Hello, World!` and the date line.
     *   Re-run `./scripts/process/build.sh` to ensure `bin/myprog` builds.
 
-4. **Scaffold integration test module**:
+4. **Scaffold integration test module**: [x]
     *   Create `tests/go.mod` with module path `github.com/axsh/tokotachi/tests` and Go `1.24.0`.
 
-5. **Add CLI integration tests (Red then Green)**:
+5. **Add CLI integration tests (Red then Green)**: [x]
     *   Create `tests/myprog_today_date_test.go` with the five `TestMyprogTodayDate_*` cases.
     *   Run Verification Plan commands; fix until green.
+    *   Note: Windows では `os/exec` が `.exe` を要求するため、`build.sh` は `GOEXE` を付与し、テストは `myprog.exe` / `myprog` の両方を探索する。
 
-6. **Run Verification Plan**:
+6. **Run Verification Plan**: [x]
     *   Execute all Automated Verification steps below, then perform §12 総合判定.
+
+### 総合判定結果
+
+**判定**: ✅ 動作確認完了
+
+#### テスト結果サマリ
+- 全テスト数: 6 件（単体 1 親 + 5 サブケース相当を 1 テスト関数、統合 5 件）
+- 単体: `TestFormatToday` PASS（iso/slash/jp/empty_as_iso/unknown）
+- 統合: `TestMyprogTodayDate_*` 5 件すべて PASS
+- 失敗: 0 件
+- 事実上スキップ: 0 件
+
+#### チェック項目の結果
+| # | チェック項目 | 結果 | 備考 |
+|---|------------|------|------|
+| 1 | スキップされたテスト | ✅ | SKIP/TODO なし |
+| 2 | 部分的なエラー | ✅ | ログに ERROR/Exception なし |
+| 3 | 迂回処理による偽成功 | ✅ | 実バイナリ exec。形式ごとに異なる期待文字列 |
+| 4 | アダプタ・コンフィグの誤適用 | ✅ | `-format` が出力に反映されることを確認 |
+| 5 | テスト間の依存・順序問題 | ✅ | ステートレス。フィルタ単独実行で PASS |
+| 6 | カバレッジの妥当性 | ✅ | 必須要件 1–6 を単体+統合でカバー |
+| 7 | 外部システムの状態 | ✅ | ローカル `bin/myprog(.exe)` のみ |
+
+#### 判定理由
+`./scripts/process/build.sh` と `./scripts/process/integration_test.sh --specify "MyprogTodayDate"` がいずれも成功し、期待する stdout/stderr/exit code を明示的に検証しているため、動作確認完了と判断する。
+
 
 ## Verification Plan
 
