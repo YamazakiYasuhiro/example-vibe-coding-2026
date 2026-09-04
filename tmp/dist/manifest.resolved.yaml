@@ -1,0 +1,2895 @@
+version: 1
+project_id: vv5
+entities:
+    bundle:
+        - apiVersion: agent.meta/v1
+          description: Default bundle of safety policies, guards, and skills.
+          id: default
+          includes:
+            - protect-generated-files
+            - deny-direct-edit-of-index
+            - require-review-for-major-arch-changes
+            - verifier
+          kind: bundle
+          selected: true
+          title: Default Safety Bundle
+    capability:
+        - apiVersion: agent.meta/v1
+          body: |4+
+            # Markdown 内ファイル参照のポータビリティ規約
+
+            このプロジェクトの Markdown ドキュメントは、Git リポジトリを通じて複数の開発者・複数の環境
+            (Windows, macOS, Linux, CI)で共有される。ドキュメント内のファイル参照が特定の環境に
+            依存していると、他の開発者がドキュメントを読む際にパスが無効になり、情報の追跡が困難になる。
+
+            この capability は、Markdown ドキュメント内でリポジトリ内のファイルを参照する際に、
+            ポータブルな形式を使用するための規約を定義する。
+
+            ## 規約
+
+            ### 禁止: 絶対パスおよび file:// スキームの使用
+
+            以下の形式はリポジトリに記録される Markdown ドキュメントでは使用してはならない。
+
+            ```markdown
+            <!-- 禁止: 絶対パス + file:// スキーム -->
+            [仕様書](file:///c:/Users/yamya/myprog/vv5/work/feat-minimum-vv/prompts/phases/refs/drafts/014-agent_procedure_integration_spec.md)
+
+            <!-- 禁止: Windows 絶対パス -->
+            [db.py](file:///c:/Users/yamya/myprog/vv5/work/feat-minimum-vv/features/chord/store/db.py)
+
+            <!-- 禁止: バックスラッシュのパス -->
+            `c:\Users\yamya\myprog\vv5\work\feat-minimum-vv\features\chord\store\db.py`
+            ```
+
+            これらの形式は、ドキュメント作成者のローカル環境でしか通用しない。
+            チェックアウト先ディレクトリが異なる開発者や、OS が異なる環境ではパスが無効になる。
+
+            ### 推奨: ワークスペース相対パスをインラインコードで記述
+
+            リポジトリ内のファイルを参照する場合は、ワークスペースルート(リポジトリルート)からの
+            相対パスを、バッククォートで囲んだインラインコードとして記述する。
+
+            ```markdown
+            詳細は `prompts/phases/refs/drafts/014-agent_procedure_integration_spec.md` を参照。
+
+            Python 側の実装は `features/chord/store/db.py` を参照。
+            ```
+
+            ### 表や箇条書き内での記述
+
+            表の中や箇条書きでも、同じ形式を使用する。
+
+            ```markdown
+            | 先行仕様書 | 関係 |
+            | :--- | :--- |
+            | `prompts/phases/000-foundation/branches/feat-minimum-vv/ideas/032-subgraph-actor-generalization.md` | 子 Actor モデルは本仕様で継続利用 |
+
+            - 先行仕様: `prompts/phases/000-foundation/branches/feat-minimum-vv/ideas/032-subgraph-actor-generalization.md`
+            - スキーマ定義: `prompts/manifest/schemas/capability.schema.json`
+            ```
+
+            ### 行番号付きの参照
+
+            特定の行範囲を示したい場合は、パスの後に行番号情報をテキストで付記する。
+
+            ```markdown
+            `features/chord/runtime/bridge.py` (L51-L154) の bridge_code を参照。
+            ```
+
+            ### パス区切り文字
+
+            パス区切り文字にはスラッシュ (`/`) を使用する。
+            バックスラッシュ (`\`) は使用しないこと。
+            スラッシュであれば Windows / macOS / Linux のいずれでも正しく解釈できる。
+
+            ### Markdown リンク記法の使い分け
+
+            | 対象 | 形式 | 例 |
+            | :--- | :--- | :--- |
+            | リポジトリ内のファイル | バッククォートの相対パス | `` `prompts/phases/refs/drafts/014-spec.md` `` |
+            | 外部 URL (HTTP/HTTPS) | Markdown リンク記法 | `[Python公式ドキュメント](https://docs.python.org/3/)` |
+
+            Markdown リンク記法 `[text](url)` は、リポジトリ外の URL に対してのみ使用する。
+
+            ## 適用範囲
+
+            この規約は、Git リポジトリに記録される全てのマークダウンファイルに適用する。
+
+            以下はこの規約の適用外とする:
+
+            - エージェントがチャット上で応答する際の一時的なリンク(IDE が解釈する `file://` リンク)
+            - CI/CD スクリプト内のパス指定
+            - コード内のファイルパス定数
+
+          description: Markdown ドキュメントを作成・編集する際に、ファイルへの参照を ワークスペースルートからの相対パスで記述し、特定の開発者環境に 依存しないポータブルな形式にする規約。
+          id: portable-file-references
+          kind: capability
+          manual_only: false
+          paths:
+            - '**/*.md'
+          selected: true
+          tags:
+            - baseline
+          title: Markdown 内ファイル参照のポータビリティ規約
+        - apiVersion: agent.meta/v1
+          body: |4
+            # Pre-Push Knowledge Check
+
+            You are an AI coding agent working in this repository.
+
+            Before running `git push`, you **MUST** inspect the changes being pushed and decide
+            whether they contain far-knowledge that should be recorded for future maintainers.
+
+            Far-knowledge is knowledge that cannot be discovered by searching nearby code
+            (same package, imports, callers). Your goal is to capture knowledge that will
+            help a future developer understand:
+
+            - Why the system has this structure
+            - Where responsibilities and boundaries are
+            - What constraints must not be broken
+            - What design decisions were made
+            - What cross-cutting patterns should be followed
+            - What conventions and style rules exist
+            - What lessons were learned from past mistakes
+            - What engineer preferences guide quality standards
+
+            ## Step 1: Inspect the Changes Being Pushed
+
+            Run the following commands to understand what will be pushed:
+
+            ```bash
+            git log --oneline origin/HEAD..HEAD
+            git diff origin/HEAD..HEAD --stat
+            git diff origin/HEAD..HEAD
+            ```
+
+            If there are no unpushed commits, report the following and stop:
+
+            ```text
+            Far-knowledge intake: no unpushed commits found. Skipping.
+            ```
+
+            ## Step 2: Determine Whether a Knowledge Note Is Needed
+
+            Create a knowledge note **only when** the changes being pushed include
+            at least one of the following signals:
+
+            ### Architecture Signals
+            1. A new module, package, directory, service, command, API, component was added.
+            2. Responsibilities were moved, split, merged, or clarified.
+            3. A boundary was introduced or changed.
+            4. Dependency direction changed or should be protected.
+            5. State ownership changed.
+            6. Data ownership, lifecycle, source of truth, or consistency rule changed.
+            7. A non-obvious design decision was made.
+            8. A rejected alternative is visible or can be inferred.
+            9. A temporary implementation, shortcut, or technical debt was introduced.
+            10. An invariant or rule must remain true for the system to work.
+            11. Error handling, retry, timeout, transaction behavior changed.
+            12. Authentication, authorization, permission, or trust boundary changed.
+            13. The change affects future extensibility or automation flow.
+            14. The change would be hard to understand later by reading only the code.
+
+            ### Cross-Cutting Signals
+            15. A design pattern was applied that should be shared across modules.
+            16. A convention or style rule was established or clarified.
+            17. A lesson was learned from a past failure or code review feedback.
+            18. An engineer preference or quality standard was communicated.
+
+            If **none** of these apply, report the following and stop:
+
+            ```text
+            Far-knowledge intake: no far-knowledge detected.
+            Reason: <brief reason>
+            ```
+
+            ## Step 3: What NOT to Record
+
+            Do **not** create knowledge notes for:
+
+            - Trivial refactoring
+            - Formatting-only changes
+            - Local implementation details obvious from nearby code
+            - Bug fixes that do not change assumptions
+            - Comments that merely repeat the code
+            - Temporary debug code
+            - Mechanical renames with no structural meaning
+
+            Knowledge notes must not become noisy commit summaries.
+
+            ## Step 4: Record via record-far-knowledge
+
+            If knowledge signals were detected in Step 2,
+            use the **record-far-knowledge** skill to record the knowledge.
+
+            Read the `record-far-knowledge` capability for full details on:
+
+            - Required command invocation and flags
+            - Category flag selection (architecture + far-knowledge flags)
+            - Distance judgment guidelines
+            - How to write good notes
+            - Dry-run for uncertain cases
+            - Report format
+
+            ## Step 5: Final Check Before Push
+
+            Before allowing `git push` to proceed, confirm:
+
+            1. All unpushed commits were inspected.
+            2. Knowledge signals were evaluated against the checklist.
+            3. record-far-knowledge was invoked if signals were detected.
+            4. Report was produced (either "recorded" or "no update").
+
+            ## Interaction Rules
+
+            - Do not ask the user whether to create a note unless the change is ambiguous.
+            - Prefer recording with a `PROVISIONAL` prefix when the signal is important
+              but partially inferred.
+            - Do not modify production code as part of this knowledge intake.
+          description: Before git push, inspect all committed changes and determine whether they contain far-knowledge that should be recorded via record-far-knowledge skill.
+          id: pre-push-knowledge-check
+          kind: capability
+          paths:
+            - src/**
+            - features/**
+            - scripts/**
+            - prompts/manifest/**
+            - shared/libs/**
+            - pyproject.toml
+          references:
+            - prompts/manifest/code_content/capabilities/record-far-knowledge.md
+          scripts:
+            - scripts/code/agent/record.sh
+          selected: true
+          tags:
+            - baseline
+          title: Pre-Push Knowledge Check
+        - apiVersion: agent.meta/v1
+          body: |4
+            # Pre-Sync Knowledge Compile
+
+            You are an AI coding agent working in this repository.
+
+            Before performing any of the following **sync operations**, you **MUST** check
+            for pending intake events and systematize them into compiled knowledge:
+
+            ## Trigger Conditions
+
+            This capability is triggered when the agent is about to perform any of:
+
+            1. **Pull Request (PR) 作成**: `gh pr create`, GitHub PR の作成操作
+            2. **Pull**: `git pull`, `git fetch && git merge`, `git rebase` (リモートからの取得)
+            3. **Branch Switch with Pull**: `git checkout <remote-branch>`, `git switch` (リモート追跡ブランチへの切替)
+
+            ## Step 1: Pending Events の確認
+
+            ```bash
+            ./scripts/code/agent/intake.sh list --status pending
+            ```
+
+            pending events が **0 件** の場合、以下を報告してそのまま sync 操作に進む:
+
+            ```text
+            Knowledge compile: no pending events. Proceeding with sync.
+            ```
+
+            ## Step 2: systematize-far-knowledge の実行
+
+            pending events が **1 件以上** ある場合、sync 操作の **前に** 以下を実行する:
+
+            1. `systematize-far-knowledge` ワークフローを実行する
+               - 全 pending events のカテゴリ化・登録
+               - processed への移行
+               - スキル化 (capability ファイルの生成)
+               - `prompt compile --apply` によるデプロイ
+            2. 生成されたファイルをコミットする
+
+            ## Step 3: Sync 操作の続行
+
+            systematize-far-knowledge が完了したら、元の sync 操作を続行する:
+
+            - **PR 作成の場合**: コミット・push 後に PR を作成
+            - **Pull の場合**: pull/fetch を実行
+
+            ## 例外
+
+            以下の場合はこのチェックをスキップしてよい:
+
+            - ユーザーが明示的に「スキップしてよい」と指示した場合
+            - emergency fix で時間的制約がある場合 (ただしその旨を報告すること)
+            - pending events が全て自分の作業とは無関係なブランチのものである場合
+
+            ## Interaction Rules
+
+            - pending events がある場合、ユーザーに確認せず自動的に systematize-far-knowledge を実行する
+            - systematize-far-knowledge の結果はユーザーに報告する
+            - sync 操作を忘れないこと (本来の操作を完遂する)
+          description: Before creating a Pull Request or pulling from a remote/local branch, ensure all pending intake events have been systematized and compiled into agent-readable skills via the systematize-far-knowledge workflow.
+          id: pre-sync-knowledge-compile
+          kind: capability
+          paths:
+            - prompts/memory/**
+            - .agents/skills/**
+          references:
+            - prompts/manifest/code_content/procedures/systematize-far-knowledge.md
+            - prompts/manifest/code_content/capabilities/pre-push-knowledge-check.md
+          scripts:
+            - scripts/code/agent/intake.sh
+          selected: true
+          tags:
+            - baseline
+          title: Pre-Sync Knowledge Compile
+        - apiVersion: agent.meta/v1
+          body: |4
+            # Prompt Manifest Update（ルール・スキル・プロンプト改変手順）
+
+            Agent 向けの**ルール・スキル・ワークフロー（手順書）**を改変するときは、
+            各エージェントの設定ディレクトリ（`.cursor/`, `.agent/`, `.codex/`, `.claude/`）を直接編集せず、
+            **manifest テンプレートを編集してからデプロイ**する。
+
+            > [!CAUTION]
+            > 各エージェントの rules / skills は **`tt prompt update` により生成される**。
+            > テンプレートとの二重管理を避けるため、**正（canonical）は常に `prompts/manifest/code_content/`** とする。
+            > テンプレートを 1 回編集すれば、全エージェントに同一内容を配布できる。
+
+            ## 1. 対応ターゲット
+
+            | ターゲット ID | エイリアス | エージェント | 出力先 |
+            |---------------|-----------|--------------|--------|
+            | `cursor` | — | Cursor | `.cursor/rules/`, `.cursor/skills/` |
+            | `antigravity` | `ag` | Antigravity | `.agent/rules/`, `.agent/skills/`, `.agent/workflows/` |
+            | `codex` | — | Codex | `.codex/rules/`, `.codex/skills/`（インデックス: `CODEX.md`） |
+            | `claude-code` | — | Claude Code | `.claude/rules/`, `.claude/skills/` |
+            | `all` | — | 上記すべて | 全ターゲットに一括デプロイ |
+
+            - ターゲット定義: `prompts/manifest/targets/{target}.yaml`
+            - `--target` 省略時は環境変数 `TT_TARGET`、未設定なら `all`
+            - **自分がどのエージェントとして動作しているかに応じて最低限そのターゲットへ反映**し、
+              他エージェントと共用するリポジトリでは `all` での一括反映を推奨
+
+            ## 2. ディレクトリ構成と種別
+
+            `prompts/manifest/code_content/` 以下の種別と、各ターゲットへの出力先の対応:
+
+            | 種別 | 配置 | スキーマ | 出力先（ターゲット共通の論理配置） | 役割 |
+            |------|------|----------|-----------------------------------|------|
+            | **policy** | `policies/*.md` | `schemas/policy.schema.json` | `{rules}/`（例: `.cursor/rules/*.mdc`, `.agent/rules/*.md`） | コーディング規範・テスト規範等（Agent ルール） |
+            | **capability** | `capabilities/*.md` | `schemas/capability.schema.json` | `{skills}/{id}/SKILL.md` | スキル（再利用可能な手順・知識） |
+            | **procedure** | `procedures/*.md` | `schemas/procedure.schema.json` | `{skills}/{id}/SKILL.md`（Antigravity は `{workflows}/`） | ワークフロー（`/build-pipeline` 等） |
+            | **refs** | `refs/*.md` | — | （参照のみ） | 補助ドキュメント |
+
+            ファイル拡張子・frontmatter 形式はターゲットごとにエミッタが変換する
+            （例: Cursor は `.mdc` + `alwaysApply`）。テンプレート側でターゲット固有の形式を書かない。
+
+            マニフェスト定義: `prompts/manifest/project.yaml`
+
+            ```
+            prompts/manifest/
+            ├── project.yaml              # ソースパス・出力設定
+            ├── targets/                  # ターゲット別マッピング
+            │   ├── cursor.yaml
+            │   ├── antigravity.yaml
+            │   ├── codex.yaml
+            │   └── claude-code.yaml
+            ├── schemas/                  # 各 kind の JSON Schema
+            └── code_content/
+                ├── policies/             # → 各ターゲットの rules
+                ├── capabilities/         # → 各ターゲットの skills
+                ├── procedures/           # → 各ターゲットの skills / workflows
+                └── refs/
+            ```
+
+            ## 3. 改変の種類別手順
+
+            ### 3.1 ルール（policy）を改変する
+
+            1. 対象ファイルを特定: `prompts/manifest/code_content/policies/{id}.md`
+            2. YAML frontmatter が `policy.schema.json` に準拠していることを確認:
+               - 必須: `apiVersion`, `kind`, `id`, `title`, `scope`, `activation`, `body`（または本文 inline）
+               - 例: `id: coding-rules`, `scope: project`, `activation.mode: trigger`
+            3. 本文（`---` 以降）を編集
+            4. **§5 デプロイ** へ
+
+            ### 3.2 スキル（capability）を新規追加・改変する
+
+            1. ファイル: `prompts/manifest/code_content/capabilities/{id}.md`
+            2. YAML frontmatter が `capability.schema.json` に準拠:
+               - 必須: `apiVersion: agent.meta/v1`, `kind: capability`, `id`, `title`, `description`, `body`
+               - `id` は kebab-case（例: `prompt-manifest-update`）
+            3. 本文に手順・制約・例を記述
+            4. 任意: `paths`, `references`, `scripts`, `manual_only`
+            5. **§5 デプロイ** へ
+
+            ### 3.3 ワークフロー（procedure）を改変する
+
+            1. ファイル: `prompts/manifest/code_content/procedures/{id}.md`
+            2. YAML frontmatter が `procedure.schema.json` に準拠:
+               - 必須: `apiVersion`, `kind`, `id`, `title`, `trigger`
+               - `trigger.command`: スラッシュコマンド名（例: `build-pipeline`）
+            3. **§5 デプロイ** へ
+
+            ## 4. 編集時の注意
+
+            - **直接編集禁止**: 各ターゲットの成果物（`.cursor/rules/*.mdc`, `.cursor/skills/*/SKILL.md`,
+              `.agent/**`, `.codex/rules|skills/**`, `.claude/rules|skills/**`）
+            - **二重管理禁止**: テンプレートと成果物の内容が乖離しないよう、編集はテンプレートのみ
+            - **ターゲット非依存に書く**: テンプレート本文に特定エージェント固有の表現
+              （「Cursor に反映する」「`.cursor/` に出力される」等）を書かない。
+              出力先に言及する場合は「各エージェントの rules / skills」のように書く
+            - **スキーマ準拠**: 新規追加時は該当 `schemas/*.schema.json` の `required` を満たす
+            - **policy 間参照**: 本文中で `{{policy:coding-rules}}` 形式の参照が使える
+            - **言語**: `prompts/` 配下のテンプレート本文は **日本語**
+            - **レガシースクリプト**: `./scripts/code/prompt/compile.sh` 等は **`tt prompt`** に統合済み。通常は `tt prompt update` を使う
+
+            ## 5. デプロイ（各エージェントへの反映）
+
+            ### 5.1 実行前の確認（BEFORE）
+
+            デプロイ前に以下を記録し、変更検知のベースラインとする
+            （以下は Cursor の例。他ターゲットは §1 の出力先に読み替える）:
+
+            ```bash
+            # メタデータ（前回デプロイ時刻・digest）
+            # Cursor: .cursor/.meta/last_update.yaml
+            # Antigravity: .agent/.meta/antigravity/last_update.yaml
+            cat .cursor/.meta/last_update.yaml
+
+            # 成果物のチェックサム
+            md5sum .cursor/rules/*.mdc .cursor/skills/*/SKILL.md 2>/dev/null | sort -k2
+
+            # ドライラン（変更予定の確認）
+            tt prompt update --target <target> --dry-run
+            ```
+
+            ### 5.2 デプロイ実行
+
+            ```bash
+            # 単一ターゲット
+            tt prompt update --target cursor
+            tt prompt update --target ag           # antigravity のエイリアス
+            tt prompt update --target codex
+            tt prompt update --target claude-code
+
+            # 全ターゲット一括（推奨: 複数エージェント共用リポジトリ）
+            tt prompt update --target all
+            ```
+
+            オプション:
+
+            | フラグ | 用途 |
+            |--------|------|
+            | `--dry-run` | ファイルを書き込まず計画のみ表示 |
+            | `--force` | 変更検知なしでも強制更新 |
+            | `--verbose` | 詳細ログ |
+            | `--report <path>` | 実行レポートを Markdown 出力 |
+
+            ### 5.3 実行後の確認（AFTER）
+
+            以下を BEFORE と比較し、反映を検証する（Cursor の例）:
+
+            ```bash
+            # メタデータが更新されたか
+            cat .cursor/.meta/last_update.yaml
+            # → updated_at, source_digest が変わっていること
+
+            # 対象ファイルのタイムスタンプ・チェックサム
+            md5sum .cursor/rules/*.mdc .cursor/skills/*/SKILL.md 2>/dev/null | sort -k2
+
+            # テンプレート本文との一致（policy / capability 例）
+            diff <(awk 'BEGIN{c=0} /^---$/{c++; next} c>=2' prompts/manifest/code_content/policies/coding-rules.md) \
+                 <(awk 'BEGIN{c=0} /^---$/{c++; next} c>=2' .cursor/rules/coding-rules.mdc) || true
+
+            # 新規スキルの存在確認（{id} は capability の id）
+            test -f .cursor/skills/{id}/SKILL.md && echo "OK: skill deployed"
+            ```
+
+            **合格基準**:
+
+            1. `tt prompt update` が exit 0
+            2. 各ターゲットの `.meta/last_update.yaml` の `updated_at` / `source_digest` が更新
+            3. 編集したテンプレートに対応する成果物が存在し、本文が一致（frontmatter 形式差のみ許容）
+            4. 意図したキーワード・見出しが成果物に含まれる
+            5. `--target all` の場合、全ターゲットで 1–4 を満たす
+
+            ## 6. トラブルシューティング
+
+            | 症状 | 対処 |
+            |------|------|
+            | `Update succeeded` だが内容が古い | `--force` で再実行。テンプレート保存忘れを確認 |
+            | スキーマエラー | frontmatter の必須フィールド・`id` の kebab-case を確認 |
+            | skills に新スキルが無い | `targets/{target}.yaml` で `capability: true` を確認 |
+            | policy が rules に無い | `targets/{target}.yaml` で `policy: true` を確認 |
+            | 特定ターゲットだけ反映されない | ターゲット ID の綴りを確認（`claude-code` はハイフン区切り。`claudecode` は不可） |
+            | 新ターゲットを追加したい | `prompts/manifest/targets/{id}.yaml` を作成し、`includes` / `paths` を定義 |
+
+            ## 7. 作業完了時の報告
+
+            デプロイ後、ユーザーに以下を報告する:
+
+            1. 編集したテンプレートファイルのパス
+            2. 実行したターゲットと `tt prompt update` の成否
+            3. BEFORE / AFTER の `last_update.yaml` 差分
+            4. 反映された成果物パス（例: `.cursor/skills/prompt-manifest-update/SKILL.md`）
+            5. 本文一致確認の結果
+
+            ## 8. 関連コマンド一覧
+
+            ```bash
+            tt prompt --help
+            tt prompt update --help
+            tt prompt compile --help    # 中間成果物の確認用
+            tt prompt deploy --help     # compile + deploy
+            ```
+
+            通常の開発フローでは **`tt prompt update --target <target>`**（または `--target all`）のみで十分。
+          description: ルール・スキル・ワークフロー等の Agent 向けプロンプトを改変する際の手順。 prompts/manifest/code_content/ 以下のテンプレートを編集し、 tt prompt update --target <target> で各コーディングエージェント （Cursor / Antigravity / Codex / Claude Code）の設定ディレクトリに反映する。
+          id: prompt-manifest-update
+          kind: capability
+          paths:
+            - prompts/manifest/**
+            - prompts/manifest/code_content/**
+            - .cursor/rules/**
+            - .cursor/skills/**
+            - .agent/rules/**
+            - .agent/skills/**
+            - .agent/workflows/**
+            - .codex/rules/**
+            - .codex/skills/**
+            - .claude/rules/**
+            - .claude/skills/**
+          references:
+            - prompts/manifest/project.yaml
+            - prompts/manifest/targets/cursor.yaml
+            - prompts/manifest/targets/antigravity.yaml
+            - prompts/manifest/targets/codex.yaml
+            - prompts/manifest/targets/claude-code.yaml
+            - prompts/manifest/schemas/capability.schema.json
+            - prompts/manifest/schemas/policy.schema.json
+            - prompts/manifest/schemas/procedure.schema.json
+          selected: true
+          tags:
+            - baseline
+          title: Prompt Manifest Update (Rules / Skills / Procedures)
+        - apiVersion: agent.meta/v1
+          body: "\n# Record Far-Knowledge via record.sh\n\nThis skill describes how to record far-knowledge into the project's\nmemory system using `./scripts/code/agent/record.sh`.\n\nFar-knowledge is knowledge that cannot be discovered by searching nearby\ncode (same package, imports, callers). It includes architecture decisions,\ncross-cutting design patterns, conventions, lessons learned, and engineer\npreferences.\n\nThis is a shared reference. It is invoked by:\n\n- **far-knowledge-memory** policy: when architecture-impacting or\n  cross-cutting changes are detected during or after implementation\n- **pre-push-knowledge-check** capability: when inspecting changes\n  before `git push`\n\n## Recording Tool\n\nThis project uses `./scripts/code/agent/record.sh` to record\nfar-knowledge into the project's memory system.\n\nYou **MUST** use record.sh. Do **NOT** manually create or edit files\nunder `prompts/memory/`.\n\n## Required Invocation\n\n```bash\n./scripts/code/agent/record.sh \\\n  --agent \"<your-agent-name>\" \\\n  --summary \"<one-line description of the knowledge>\" \\\n  --changed-paths-from-git \\\n  <category-flags> \\\n  --note \"<note 1>\" \\\n  --note \"<note 2>\" \\\n  ...\n```\n\n### Required Flags\n\nEvery invocation **MUST** include:\n\n- `--agent \"<your-agent-name>\"` : Your agent name (one of: `antigravity`, `claude-code`, `codex`, `cursor`)\n- `--summary \"...\"` : A one-line description of what changed\n- `--changed-paths-from-git` : Automatically detects changed files from git\n- At least one category flag (see below)\n\n### Category Flags (pick all that apply)\n\n| Flag | When to use |\n|------|-------------|\n| `--architecture-impact` | New/removed packages, changed module boundaries, new CLI commands, new API endpoints |\n| `--memory-related` | Changes to memory system itself (`prompts/memory/`, `scripts/code/agent/`) |\n| `--prompt-related` | Changes to prompt templates (`prompts/manifest/`) |\n| `--agent-behavior-related` | Changes to agent rules, workflows, or skills (`.agents/`) |\n| `--design-pattern` | Cross-cutting design patterns shared across modules |\n| `--convention` | Conventions and style rules (log format, DB design, API design, comment style) |\n| `--lesson-learned` | Lessons from past failures or review feedback |\n| `--preference` | Engineer preferences or quality standards |\n\n### Optional Flags\n\n| Flag | Purpose |\n|------|---------| \n| `--changed-path \"<path>\"` | Manually specify a changed path (repeatable) |\n| `--dry-run` | Preview without recording |\n| `--print-payload` | Print the JSON payload (useful with `--dry-run`) |\n\n## Distance Judgment Guidelines\n\nUse these criteria to decide whether to record:\n\n1. **Can this knowledge be found by searching nearby code?** (same package, imports)\n   -> If yes, skip recording.\n2. **Would this knowledge help when developing an unrelated module?**\n   -> If yes, record with `--design-pattern`.\n3. **Is this knowledge based on past decisions/feedback and not readable from code?**\n   -> If yes, record with `--lesson-learned`.\n4. **Is this knowledge about engineer preferences or quality standards?**\n   -> If yes, record with `--preference`.\n\n## Writing Good Notes\n\nEach `--note` value MUST capture a **single knowledge proposition**.\nFocus on **why**, **what boundary**, **what constraint**, or **what decision** --\nnot on **what code was written**.\n\n### Good Notes\n\n```text\n--note \"API handlers must not access the database directly; all DB access goes through usecase services\"\n--note \"Error responses in API handlers use shared apierror types; internal errors are logged but clients receive generic messages\"\n--note \"Integration test names follow TestXxx_Scenario format to allow --specify filtering\"\n--note \"Prefer explicit error wrapping with fmt.Errorf and %w over bare error returns for traceability\"\n```\n\n### Bad Notes\n\n```text\n--note \"Added a new function to handle tasks\"\n--note \"Updated some files for better architecture\"\n--note \"Pipeline: A -> B -> C -> D\"\n```\n\nEach note MUST be a single proposition. Do not pack multiple concepts into one note.\n\n## Note Content Guidelines\n\nWhen writing notes, prioritize these types of knowledge:\n\n| Type | What to capture |\n|------|----------------|\n| **Component responsibility** | What this part of the system is responsible for, and what it intentionally excludes |\n| **Boundary** | Which layer may call which; which component owns which data |\n| **Invariant** | Conditions that must remain true |\n| **Design decision** | The selected design and why it was chosen |\n| **Rejected alternative** | What was considered but not chosen, and why |\n| **Cross-cutting pattern** | Patterns applicable across multiple modules |\n| **Convention** | Naming, formatting, or structural rules |\n| **Lesson learned** | Past mistakes or review feedback |\n| **Risk / temporary** | Provisional implementations or tech debt |\n\n## Dry-Run for Uncertain Cases\n\nIf you are unsure whether the change qualifies, run a dry-run first:\n\n```bash\n./scripts/code/agent/record.sh \\\n  --agent \"<your-agent-name>\" \\\n  --summary \"<description>\" \\\n  --changed-paths-from-git \\\n  --design-pattern \\\n  --note \"<note>\" \\\n  --dry-run --print-payload\n```\n\n## Report Format\n\nAfter running record.sh, include the following in your log output:\n\n```text\nFar-knowledge intake: recorded.\nSummary: <summary passed to record.sh>\nNotes:\n- <note 1>\n- <note 2>\nFlags: <flags used>\n```\n\nIf no recording was made:\n\n```text\nFar-knowledge intake: no update.\nReason: <brief reason>\n```\n\n## User Report\n\nAfter this skill completes, you **MUST** report the outcome to the user\nwith an explanation. Do not simply state the result -- explain the\nreasoning so the user understands what happened and why.\n\n### When knowledge was recorded\n\nExplain to the user:\n- **What knowledge was captured**: Describe the key insight, decision,\n  or pattern that was recorded, in plain language the user can understand\n  without reading the raw notes.\n- **Why it qualifies as far-knowledge**: Briefly explain why this\n  knowledge cannot be discovered from nearby code and how it would\n  benefit future work in other parts of the codebase.\n\n### When no knowledge was recorded\n\nExplain to the user:\n- **Why you decided not to record**: Describe which of the distance\n  judgment criteria (see \"Distance Judgment Guidelines\" above) you\n  evaluated and why none were met. Be concrete -- for example: \"The\n  change is localized to a single package and can be discovered from its\n  direct imports, so it does not meet the far-knowledge threshold.\"\n- **What would make it recordable**: If applicable, briefly mention what\n  kind of additional context or scope would elevate the work to\n  far-knowledge (e.g., \"If this pattern were adopted across multiple\n  modules, it would qualify as a cross-cutting design pattern.\").\n\n## Constraints\n\n- Do not modify production code as part of knowledge intake.\n- Do not create or edit files under `prompts/memory/` directly.\n- Do not run `./scripts/code/prompt/compile.sh`, `./scripts/code/prompt/deploy.sh`,\n  or `./scripts/code/prompt/update.sh` unless the user explicitly asks.\n- Use record only to store long-term memory candidates.\n- Do not edit canonical memory documents for intake.\n"
+          description: Shared skill for recording far-knowledge (cross-cutting knowledge not discoverable from nearby code) into the project memory system using ./scripts/code/agent/record.sh. Referenced by far-knowledge-memory policy and pre-push-knowledge-check capability.
+          id: record-far-knowledge
+          kind: capability
+          manual_only: true
+          references:
+            - prompts/memory/schemas/agent-record-payload.schema.json
+          scripts:
+            - scripts/code/agent/record.sh
+          selected: true
+          tags:
+            - baseline
+          title: Record Far-Knowledge via record.sh
+        - apiVersion: agent.meta/v1
+          body: |4
+            # 回答末尾の「まとめ」セクション付与
+
+            ユーザーへ最終回答を返すときは、本文のあとに必ず「まとめ」セクションを付ける。
+            途中経過の短い確認や、ツール実行のみの中間メッセージには付けなくてよい。
+            ユーザーが読む最終メッセージには必ず付ける。
+
+            ## 必須ルール
+
+            1. 最終回答の末尾に、見出し `## まとめ` を置く
+            2. 「まとめ」は本文より前に置かない。回答本文の最後に置く
+            3. 内容は 2〜5 個の箇条書きで、次を優先して書く:
+               - 何をしたか / 何が分かったか（結論）
+               - 変更・成果物がある場合はその所在（パスや対象）
+               - ユーザーに依頼・判断待ちがある場合はその要点
+            4. 本文の長文をそのまま繰り返さない。要点だけを短く言い切る
+            5. 「まとめ」見出しの表記は固定する（「サマリー」「Summary」「要約」などに変えない）
+
+            ## 書式
+
+            ```markdown
+            （回答本文）
+
+            ## まとめ
+
+            - 要点1
+            - 要点2
+            - 要点3（あれば）
+            ```
+
+            ## 良い例 / 悪い例
+
+            **良い例**
+
+            ```markdown
+            coding-rules のテスト命名規約を更新し、各エージェントへデプロイしました。
+
+            ## まとめ
+
+            - テンプレート `prompts/manifest/code_content/policies/coding-rules.md` を更新した
+            - `tt prompt update --target all` で全ターゲットへ反映した
+            - レビュー後、必要ならコミットを依頼してほしい
+            ```
+
+            **悪い例**
+
+            - 「まとめ」見出しが無い
+            - 本文の全文を「まとめ」に再掲している
+            - 「### Summary」など別名になっている
+            - 途中の進捗メッセージなのに毎回「まとめ」を付けて冗長になっている
+
+            ## 適用タイミング
+
+            | 場面 | 「まとめ」 |
+            |------|------------|
+            | タスク完了の最終報告 | 必須 |
+            | ユーザーの判断・承認待ちで一旦返すとき | 必須 |
+            | 調査結果の説明 | 必須 |
+            | ツール実行中の短い中間報告 | 不要 |
+            | ユーザーの一文質問への短い確認だけ | 任意（最終回答なら付ける） |
+          description: ユーザーへの最終回答の末尾に、必ず「まとめ」セクションを付ける。 結論・実施内容・次のアクションを短く整理し、読み手が要点をすぐ把握できるようにする。
+          id: response-summary-section
+          kind: capability
+          manual_only: false
+          selected: true
+          tags:
+            - baseline
+          title: 回答末尾の「まとめ」セクション付与
+        - apiVersion: agent.meta/v1
+          body: |4
+            # Philosophy: Agentic System as Code
+
+            ## 1. ビジョン (Vision)
+
+            本プロジェクトは、エージェント（AI）を用いたシステム開発において、**「Agentic System as Code」** というパラダイムを提唱します。
+
+            AI への指示（プロンプト）や実行環境の設定は、これまで「非構造的なテキスト」や「その場限りのデータ」として扱われがちでした。しかし、複雑な自律型システム（Agentic System）においては、これらの要素こそがシステムの挙動を決定する重要な「ロジック」です。
+
+            私たちは、これらを TypeScript による厳密なコードとして記述し、管理することで、従来のプログラムコードが持つ**「型（Type）」**と**「関連性（Relationship）」**の恩恵をエージェントの世界に持ち込みます。
+
+            ## 2. コア・原則 (Core Principles)
+
+            ### 2.1 構造化された指示 (Structured Instructions)
+            プロンプトは単なるマークダウンではなく、他のプロシージャやツールとの依存関係を持つ「ソースコード」です。DSL を通じて記述することで、プロンプト間のリンクや呼び出し構造を静的に解析可能にします。
+
+            ### 2.2 型安全な構成 (Type-Safe Configuration)
+            エージェントの実行環境（デプロイメント設定）は、型定義されたインターフェースを通じて構築されるべきです。これにより、設定ミスをコンパイルタイム（DSL ビルド時）に検出し、意図しない挙動を防ぎます。同時に、Agent の進化に追従するための拡張性（エスケープハッチ）も保持します。
+
+            ### 2.3 システムの統合俯瞰 (Unified System View)
+            従来の命令的プログラム制御（Traditional Control）と、エージェントによる自律的実行（Agentic Execution）を同一の DSL 上で統合します。これにより、システム全体のデータフローと制御構造を、単一のコードベースから俯瞰し、管理することを可能にします。
+
+            ### 2.4 指示書はロジックである (Prompt as Logic)
+            マークダウンで記述された指示書は、システムの実行時に解釈される「実行バイナリ」に近い存在です。コードで管理することで、バージョン管理、テスト、リファクタリングといったソフトウェアエンジニアリングのベストプラクティスをプロンプト開発に適用します。
+
+            ### 2.5 設計図と具現化 (Blueprint and Materialization)
+            DSL 上での定義はシステムの「論理設計図（Blueprint）」です。「デプロイメント」とは、この設計図を、特定のエージェント（Claude Code や Codex 等）が最適に動作できる「物理的な環境構造（Materialization）」へと具現化する行為です。関連するスキル（Capability）、ルール（Policy）、依存する手続きを、エージェント固有の作法に従ってディレクトリやファイルへと適切にマッピングします。
+
+            ### 2.6 ラッパースクリプトによるカプセル化 (Encapsulation via Wrapper Scripts)
+            エージェントが外部関数（fn）や他のプロシージャを呼び出す際、プロンプト内に複雑なコマンドラインを直接露出させるべきではありません。呼び出しロジックはデプロイ時にシェルスクリプト等にラッピングして書き出し、エージェントにはそのスクリプトを実行させるべきです。これにより、プロンプトの肥大化を防ぎ、将来的な引数の複雑化やデータ連携の変更に対して、エージェント側の指示（コード）を変更せずに対応できる「カプセル化」を実現します。
+
+            ## 3. 目標 (Goals)
+
+            私たちは、AI が複雑なタスクをこなすための「知能」を、場当たり的なプロンプトエンジニアリングから、予測可能で管理可能な「ソフトウェア・エンジニアリング」へと昇華させることを目指します。
+          description: 本プロジェクトにおけるWorkflowの設計における基本的な思想を定義する。 TSファイルを用いる理由と、ビジョンを示す。
+          id: workflow-blueprint-design-philosophy
+          kind: capability
+          manual_only: false
+          paths:
+            - '**/*.md'
+          selected: true
+          tags:
+            - baseline
+          title: TypeScriptを用いたWorkflow記述における設計思想
+    guard:
+        - action: deny
+          apiVersion: agent.meta/v1
+          description: Prohibit direct editing of prompts/memory/index.md.
+          event: file_write
+          id: deny-direct-edit-of-index
+          kind: guard
+          paths:
+            - prompts/memory/index.md
+          selected: true
+          title: Deny Direct Edit of Index
+        - action: deny
+          apiVersion: agent.meta/v1
+          description: Prevent manual editing of generated files to maintain single source of truth.
+          event: file_write
+          id: protect-generated-files
+          kind: guard
+          paths:
+            - .agent/rules/**
+            - .agent/skills/**
+            - .agent/workflows/**
+          selected: true
+          title: Protect Generated Files
+        - action: require_review
+          apiVersion: agent.meta/v1
+          description: Enforce human review when editing major architecture documents.
+          event: file_write
+          id: require-review-for-major-arch-changes
+          kind: guard
+          paths:
+            - prompts/memory/invariants.md
+            - prompts/memory/decisions.md
+          selected: true
+          title: Require Review for Major Architecture Changes
+    policy:
+        - activation:
+            mode: trigger
+          apiVersion: agent.meta/v1
+          applies_when: Applies when writing or reviewing Python/TypeScript code
+          body: |
+            # コーディング規範 (Coding Rules)
+
+            本規範は、コードの記述スタイル、技術スタック、および実装上の制約を定め、コードの品質と保守性を確保することを目的とします。
+
+            ## 1. 使用する技術
+
+            ### 1.1 Backend (Python)
+            - **言語**: Python (v3.12+)
+            - **パッケージ管理**: `uv` + `pyproject.toml`（依存関係・仮想環境の正）
+            - **ライブラリ** (推奨):
+              - Web API: `fastapi` + `uvicorn` (OpenAPI 自動生成)
+              - Database: `sqlalchemy` 2.x + `sqlite` (開発/単体テスト用), `postgres` (本番想定)
+              - Validation / Settings: `pydantic` / `pydantic-settings`
+              - Testing: `pytest` + `pytest-asyncio`（非同期テスト時）
+
+            ### 1.2 Frontend (VSCode/TypeScript)
+            - **言語**: TypeScript (v5.x+)
+            - **フレームワーク**: React (Webview), VSCode API (Extension)
+            - **Testing**:
+              - Unit: Jest / Vitest (Webview components)
+              - E2E: Playwright (VSCode Extension Testing)
+
+            ## 2. ワークフローと開発プロセス
+
+            本プロジェクトは **Vibe Coding** スタイルを採用し、AIエージェントとの協働を前提とします。
+
+            1. **定型処理のスクリプト化**:
+               ビルド、テスト、デプロイなどの操作は `scripts/` ディレクトリ配下にシェルスクリプトとして実装すること（例: `scripts/process/build.sh`, `scripts/process/integration_test.sh`）。これらは `--help` を実装し、AIが自律的に実行可能でなければならない。
+               > [!IMPORTANT]
+               > `npm run build`, `python -m pytest`, `uv run pytest` などの直接実行は、環境間の差異や成果物の配置不整合を招くため **禁止** します。必ず対応する `scripts/process/` 配下のスクリプトを使用してください。
+
+            2. **ワークフローによるオーケストレーション**:
+               一連の作業手順（例: 修正→テスト→再テスト）は各エージェントの workflows / skills に定義し、定型化する。
+
+            3. **TDD (テスト駆動開発) の徹底**:
+               開発は必ず以下のサイクルで進めること。
+               1. **レッド**: 実装の前に、その機能の要件を満たすテストコード（Unit Test）を先に書く。この時点でテストは失敗する。
+               2. **グリーン**: テストを通過させるための最小限の実装を行う。
+               3. **リファクタリング**: テスト通過後、コードの品質を高めるためにリファクタリングを行う。
+               *テストのない実装は原則として認めない。*
+
+            ## 3. 実装上の共通ルール
+
+            ### 3.1 コードの品質と保守性
+
+            *   **ファイル・関数の分割**: 単一のファイルまたは関数の行数が **800行** を超える場合、コードの可読性と保守性を確保するために、ファイルの分割や関数の抽出を積極的に検討すること。
+            *   **DRY 原則 (Don't Repeat Yourself)**: 重複したロジックは共通関数や共有パッケージへ抽出し、再利用性を高めること。同じロジックを複数箇所に書くことは保守コストを増加させるため禁止する。
+            *   **KISS 原則 (Keep It Simple, Stupid)**: 実装は常にシンプルに保つこと。複雑な抽象化や過剰な設計は可読性を損なう。問題を解決する最もシンプルな方法を選択し、不必要な複雑さを持ち込まないこと。
+            *   **YAGNI 原則 (You Aren't Gonna Need It)**: 現時点で必要のない機能を先読みして実装しないこと。「将来必要になるかもしれない」という理由だけで機能を追加することは禁止する。実際に要件として確定した時点で実装する。
+            *   **利用していないコードの削除**: どこからも参照されず、利用されない変数、関数、コードは可能な限り削除してください。
+
+            ### 3.2 コメントと言語設定
+
+            *   **コメントの言語**: ソースコード内のコメント（ドキュメントコメント、インラインコメント含む）はすべて **英語** で記述すること。日本語の使用は **禁止** とする。
+                *   **理由**: プロジェクトの国際的な可読性を確保し、AIモデルが意図を正確に解釈できるようにするため。
+
+            ## 4. テスト実装規約
+
+            ### 4.1 テストの構成
+
+            #### Backend (Python)
+            *   **単体テスト (Unit Test)**:
+                *   対象: `src/` および `features/` 配下の各パッケージ。
+                *   実行: `scripts/process/build.sh --skip-frontend --skip-etc`（内部で pytest を実行）。
+                *   制約: **Fail Fast**。外部通信を行わず、モックを使用すること。
+            *   **統合テスト (Integration Test)**:
+                *   対象: `tests/` ディレクトリ配下。
+                *   実行: `scripts/process/integration_test.sh` (カテゴリ指定なし、または `llm` 等のバックエンドカテゴリ指定)。
+                *   制約: 実際のコンテナやAPIと通信を行う。
+
+            #### Frontend (VSCode/TypeScript)
+            *   **単体テスト (Unit Test)**:
+                *   対象: Webview (React) コンポーネント等。
+                *   実行: `npm test` (Webviewディレクトリ内) は開発時のみ許容。CI/Verificationでは `scripts/process/build.sh` を使用すること。
+            *   **E2Eテスト (Integration Test)**:
+                *   対象: VSCode拡張機能の挙動検証。
+                *   実行: `scripts/process/integration_test.sh --categories gui`。
+                *   制約: Test Driver Patternを使用し、VSCodeのインスタンスを起動して検証する。
+
+            ### 4.2 テスト自動化
+
+            *   PR作成前やコミット前には必ず build-pipeline に相当するフロー（Unit Test -> Build -> Integration Test）を実行し、品質を担保すること。
+
+            ### 4.3 E2Eテストの堅牢性 (E2E Test Robustness)
+
+            *   **Action-Verification パターン**:
+                *   アクション（クリック、入力など）を行う際は、必ずその直後に期待する結果（要素の表示、状態変化など）を検証すること。
+                *   非推奨: `await click(...)` -> `await timeout(...)`
+                *   必須: `await driver.runAction(..., verification)` または `await click(...)` -> `await expect(...).toBeVisible()`
+            *   **Fail Fast**:
+                *   アクション実行中にブラウザコンソールのエラーや例外が発生した場合は、即座にテストを失敗させること（`runAction` ヘルパーの使用を推奨）。
+            *   **Editor Cleanup**:
+                *   テスト終了時や開始時のエディタ終了処理には、必ず `driver.closeAllEditors()` を使用し、保存ダイアログ等のハンドリングをドライバに委譲すること。生の `View: Close All Editors` コマンドの使用は禁止する。
+
+            ## 5. ロギングと通信処理
+
+            *   **統一ログシステムの使用**: 全てのログ出力は、プロジェクト共通のロガーモジュールを通じて行うこと。標準の `print` や、アドホックな `logging.getLogger(__name__)` の散在は禁止とする（共通ロガー経由で取得すること）。
+            *   **ログレベルの使い分け**: `DEBUG`, `INFO`, `WARNING`, `ERROR` を適切に使い分けること。
+
+            ### 5.2 Web Frontend API Request
+
+            *   **標準Utilsの使用**: Webview内でのAPIリクエストには、必ず `ide/webview/src/utils/api.ts` の `fetchWithRetry` と `ide/webview/src/utils/config.ts` の `getApiBaseUrl` を使用すること。
+            *   **禁止事項**:
+                *   `fetch` の直接使用 (リトライやエラーハンドリングが統一されないため)
+                *   `http://localhost` やポート番号のハードコード (環境依存を避けるため)
+
+
+            ## 6. ファイル操作とパス
+
+            *   **設定ファイルの分離**: 機密情報や環境依存の設定は `settings/` 配下のYAMLファイルで管理し、コード内にハードコードしないこと。
+            *   **パス指定の標準**: 内部的なファイルパス操作には `pathlib.Path` を使用し、OS間の差異（セパレータ等）を吸収すること。文字列結合によるパス組み立ては禁止する。
+
+            ## 7. Python のモダンな記述 (Modern Python Practices)
+
+            Python 3.12 以降の機能と型ヒントを活用し、以下の指針に従うこと。
+
+            1.  **Type Hints**:
+                *   公開関数・メソッドには引数と戻り値の型注釈を付ける。
+                *   `list[T]`, `dict[K, V]`, `X | Y` など組み込みジェネリック／ユニオン構文を優先し、`typing.List` / `Optional` 等の旧記法は避ける。
+                *   実行時チェックが必要な境界（API入出力・設定）では `pydantic` モデルを用いる。
+
+            2.  **Protocols / ABC**:
+                *   依存の差し替えが必要な箇所では、具象クラスではなく `typing.Protocol` または小さな ABC で契約を定義する。
+                *   インターフェースは「定義する側」ではなく「利用する側」に寄せ、メソッド数は最小限（1-3個）に留める。
+
+            3.  **Async**:
+                *   I/O 待ちが主体の処理には `async`/`await` を用いる。
+                *   同期ブロッキング呼び出しをイベントループ内で直接実行しない（必要なら `asyncio.to_thread` 等で隔離）。
+
+            4.  **Dataclasses / Pydantic**:
+                *   単純な値オブジェクトには `@dataclass(frozen=True)` を検討する。
+                *   バリデーションやシリアライズが必要なモデルには Pydantic を使う。
+
+            5.  **Imports and Packages**:
+                *   パッケージは `src/` レイアウト（または `features/<name>/` 配下のパッケージ）を正とする。
+                *   相対インポートは同一パッケージ内に限定し、跨パッケージは絶対インポートを使う。
+          id: coding-rules
+          kind: policy
+          scope: project
+          selected: true
+          tags:
+            - baseline
+          title: Coding Rules
+        - activation:
+            mode: always
+          apiVersion: agent.meta/v1
+          applies_when: Applies when changing architecture-sensitive code, module boundaries, or establishing cross-cutting patterns
+          body: |4
+            ## Mandatory Record After Far-Knowledge Changes
+
+            When you complete a coherent task boundary (e.g. after `git commit`, before `git push`),
+            you **MUST** invoke the **record-far-knowledge** skill if any of the following occurred:
+
+            ### Architecture Signals
+            - A new Python package (`src/`, `features/`, shared libs) was added or removed
+            - A new CLI subcommand or API endpoint was introduced
+            - Data models or database schemas were added or modified
+            - Module boundaries or dependency relationships changed
+            - New wrapper scripts (`scripts/`) were created
+            - Agent-facing configuration or workflow files were changed
+            - A design decision was made that future agents should know about
+
+            ### Cross-Cutting Signals
+            - A design pattern was applied that should be shared across modules
+            - A convention or style rule was established or clarified
+            - A lesson was learned from a past failure or code review feedback
+            - An engineer preference or quality standard was communicated
+
+            Do **NOT** skip this step. Even if you are unsure whether the change qualifies,
+            run record with `--dry-run` first to inspect the payload.
+
+            ### Execution Timing
+
+            Run record **once per coherent task boundary**. Typical timing:
+            1. After completing a logical unit of work and running `git commit`
+            2. Before running `git push`
+            3. If multiple commits form one logical change, record once after the last commit
+
+            ### How to Record
+
+            Use the **record-far-knowledge** skill for full details on:
+
+            - Required command invocation (`./scripts/code/agent/record.sh`)
+            - Required and category flags (architecture + far-knowledge flags)
+            - Distance judgment guidelines
+            - How to write good notes
+            - Dry-run for uncertain cases
+            - Command examples and report format
+
+            ## General Rules
+
+            Use record only to store long-term memory candidates.
+            Do not edit canonical memory documents for intake.
+            Do not run `./scripts/code/prompt/compile.sh`, `./scripts/code/prompt/deploy.sh`, or `./scripts/code/prompt/update.sh`
+            unless the user explicitly asks for consolidation or deployment.
+          id: far-knowledge-memory
+          kind: policy
+          scope: project
+          selected: true
+          tags:
+            - baseline
+          title: Far-Knowledge Memory Policy
+        - activation:
+            mode: trigger
+          apiVersion: agent.meta/v1
+          applies_when: Applies when writing Python code that includes logging statements
+          body: |
+            # ログ記述規範 (Logging Rules)
+
+            本規範は、ログの記述基準を定め、運用時の障害調査と開発時のデバッグを効率化することを目的とする。
+
+            ## 1. ログレベルの使用基準
+
+            ### 1.1 INFO (運用者向け -- 平時確認)
+
+            **定義**: システム管理者が、トラブルではない平時にでも確認しておきたいログ。正常に動作していることが分かるもの。
+
+            **出力すべき場面**:
+            - サーバー/コンポーネントの起動・終了
+            - 設定ファイルのロード完了と主要設定値のサマリ
+            - 外部接続の確立（DB、API、syslog）
+            - リクエスト受付のサマリ（詳細はDEBUG以下）
+
+            **出力してはいけないもの**:
+            - ループ内の反復ごとのログ
+            - 変数値のダンプ
+
+            ### 1.2 WARN (運用者向け -- 警告)
+
+            **定義**: エラーではないが、エラーにつながる可能性がある望ましくない状態。
+
+            **出力すべき場面**:
+            - マージン付き閾値の逆転・超過
+            - スローダウンの検出
+            - リトライの発生（試行回数を含む）
+            - 継続可能な例外の発生
+            - ファイル読み取り失敗（フォールバックあり）
+            - レスポンスのフォーマット/バージョン不一致（互換性で読める場合）
+            - syslog 接続失敗によるフォールバック発生
+
+            ### 1.3 ERROR (運用者向け -- 障害)
+
+            **定義**: 処理を続行できず諦めなければならない問題。
+
+            **必須ルール**: ERROR ログには**その時点で収集可能な有益情報を全て含める**。後から TRACE レベルにして再現するのでは機会を逃すため、ERROR ログ自体に詳細なコンテキストを含めること。
+
+            **含めるべき情報**:
+            - エラーメッセージとスタックトレース（利用可能な場合）
+            - リクエストの概要（URL、メソッド、モデル名）
+            - レスポンスの概要（ステータスコード、ボディの先頭 500 バイト）
+            - コンテキスト情報（セッションID、プロバイダー名、変換パス）
+            - 発生時のタイムスタンプ
+
+            **注意**: `sys.exit()` や未捕捉例外による強制終了は不要。あくまでその処理のエラーを通知する。
+
+            ### 1.4 DEBUG (開発者向け -- フロー追跡)
+
+            **定義**: 何を処理しているかが分かるもの。外形からの観測だけで内部処理フローが理解できるようにする。
+
+            **出力すべき場面**:
+            - 関数のエントリ（主要な関数のみ。ユーティリティ関数は不要）
+            - 条件分岐の判定結果（例: "routing to openai provider", "using responses mode"）
+            - オブジェクトの生成・破棄（セッション作成、プロセス起動/終了）
+            - ルーティング決定の理由
+            - 設定値の適用結果
+
+            **パラメータ**: 処理を説明するための簡単なパラメータを含める。
+            ```python
+            logger.debug("routing request", extra={"model": model, "provider": provider, "mode": mode})
+            ```
+
+            ### 1.5 TRACE (開発者向け -- データダンプ)
+
+            **定義**: DEBUG を補足する詳細データのダンプ。
+
+            **出力すべき場面**:
+            - JSON ボディの全文（リクエスト/レスポンス）
+            - HTTP ヘッダーの一覧
+            - SSE イベントの生データ
+            - 設定ファイルの全内容
+            - 変換前後のデータ比較
+            - CLI プロセスの stdout/stderr の生出力
+
+            **注意**: TRACE は大量のデータを出力するため、本番環境では通常無効にする。
+
+            ## 2. コンポーネントタグ付けルール
+
+            すべてのコンポーネントは共通ロガー経由でコンポーネント名を付与し、ログにコンポーネント名を含めること。
+            （実装はプロジェクト共通ロガーの API に従う。例: `with_component("tern")`）
+
+            | コンポーネント | タグ名 |
+            |---|---|
+            | Tern コアサーバー | `tern` |
+            | LLM Gateway Proxy | `llmgateway` |
+            | Agent Service | `agentservice` |
+            | Coding Agent (Claude Code) | `claudecode` |
+            | Coding Agent (Codex) | `codex` |
+            | WebSocket Server | `wsserver` |
+            | Bifrost Driver | `bifrost-driver` |
+            | Config Loader | `config` |
+            | Vault | `vault` |
+
+            ## 3. フィールド命名規則
+
+            ログのキー/バリューフィールドには以下の命名規則を適用する:
+
+            - **スネークケース**を使用: `session_id`, `model_name`, `provider`
+            - **共通フィールド名**:
+              - `session_id`: セッション識別子
+              - `model`: モデル名
+              - `provider`: プロバイダー名 ("anthropic", "openai")
+              - `method`: HTTP メソッド
+              - `path`: リクエストパス
+              - `status`: HTTP ステータスコード
+              - `duration_ms`: 処理時間（ミリ秒）
+              - `error`: エラーメッセージ
+              - `body_size`: ボディサイズ（バイト）
+              - `attempt`: リトライ試行回数
+
+            ## 4. 実装における注意事項
+
+            - **DEBUG ログは積極的に挿入する**。外形からの観測だけで内部処理が追跡できる透明性を目標とする。
+            - **TRACE ログはデータダンプ専用**。DEBUG ログに変数の中身を書かず、TRACE に分離する。
+            - **ERROR ログは詳細に**。後で再現するのでは遅い。その時点の情報を全て含める。
+            - **INFO ログは控えめに**。ループ内やリクエストごとに大量のINFOを出さない。
+          id: logging-rules
+          kind: policy
+          scope: project
+          selected: true
+          tags:
+            - baseline
+          title: Logging Rules
+        - activation:
+            mode: trigger
+          apiVersion: agent.meta/v1
+          applies_when: Applies when creating implementation plans or design documents
+          body: "# 計画立案規範 (Planning Rules)\n\n本規範は、計画立案プロセス、品質管理、およびビルド/テストの実行基準を定め、プロジェクトの円滑な進行を確保することを目的とします。\n\n## 1. テストと品質に対する共通哲学 (General Philosophy)\n\nコンポーネントと言語に関わらず、以下の原則を遵守してください。\n\n### 1.1 TDD (Test Driven Development)\n*   **Failed First**: いかなる機能も、「その機能が正しく動作することを確認するテスト」を先に書き、それが失敗することを確認してから実装を開始してください。\n*   **Verification Oriented**: 「どう実装するか」の前に「どう検証するか（テストするか）」を計画してください。検証不可能な機能は実装してはいけません。\n\n### 1.2 Fail Fast\n*   フィードバックループを最小化するため、単体テスト（Unit Test）は高速に実行可能であることを維持してください。\n*   統合テスト等の重いテストを回す前に、単体テストで論理的な誤りを排除してください。\n\n### 1.3 Concretization (具体化)\n*   **Abstraction is Logic Loss**: 仕様書から実装計画への変換プロセスは、抽象化（要約）ではなく、**具体化（詳細化）**のプロセスでなければなりません。\n    *   **Data Structure is Mandatory**: 仕様書に記載された構造体定義やデータモデルは、必ず実装計画の `Proposed Changes` に含めてください。これらを「自明な既存コード」や「コンテキスト情報」として省略してはいけません。\n*   **Traceability**: 前段のドキュメント（仕様書）に記載された具体的な手順、条件、シナリオ（例: 「(1) Aして (2) Bする」）は、実装計画においても個別の検証項目または実装手順として明確に追跡可能である必要があります。\n\n## 2. 計画策定における要件 (Planning Requirements)\n\n実装計画 (`prompts/phases/.../plans/...`) を作成する際は、**「これを読めば実装の実現方法が明確にわかる」** レベルの詳細さが求められます。\n\n- どのファイルを新規に作成すべきか、もしくはどのファイルをどのように修正すべきかを明確に記述してください。\n- コーディングする際に必要な情報を、具体的に記載してください。\n\n### 2.1 Backend Development (Python)\n\nバックエンド機能の計画においては、以下の要素を具体的に記述してください。\n\n*   **詳細な実現手順**:\n    *   どのパッケージの、どのクラス/Protocol/関数に変更を加えるか。\n    *   追加するAPIエンドポイントの定義（パス、メソッド、リクエスト/レスポンス。Pydantic モデル名を含む）。\n*   **テスト計画 (Unit & Integration)**:\n    *   **Unit Tests**: `@pytest.mark.parametrize` によるケース設計。モックが必要な依存関係（DB, 外部API）。\n    *   **Integration Tests**: `tests/` 配下のどのファイルに追加するか。実際のDBやDockerコンテナとの連携確認手順。\n    *   **統合テスト必要性の判断基準**: 以下のいずれかに該当する場合、統合テストは**必須**です。\n        *   ファイルシステムへの書き込み/読み取りを行う\n        *   SQLite/DB 操作を行う\n        *   外部コマンド (git 等) を呼び出す\n        *   CLI サブコマンドとして利用者に提供される\n        *   上記のいずれにも該当しない純粋なロジックのみの場合は、単体テストのみで可。ただし Verification Plan にその理由を明記すること。\n    *   記述順序: `Proposed Changes` では必ず `test_*.py` を先に記述してください。\n\n### 2.2 Frontend Development (VSCode/React)\n\nVSCode拡張機能およびWebviewの計画においては、GUI特有の検証容易性を確保するため、以下の要素が必須です。\n\n*   **Component Design (Webview)**:\n    *   ReactコンポーネントのProps定義とState管理。\n    *   **Test IDの定義**: テストから操作するインタラクティブな要素（ボタン、入力欄）には、必ず `data-testid` を定義するよう計画に含めてください。\n        *   例: 「Runボタン (`data-testid=\"run-button\"`) を追加する」\n*   **E2E Scenarios (VSCode Integration)**:\n    *   **主たる検証手段**: GUIの可視的な変更やインタラクションの追加は、必ず E2E テストシナリオとして定義します。手動確認はあくまで補助的な位置付けです。\n    *   **Test Driver Pattern**: UI操作を直接テストコードに書くのではなく、検証用ドライバー (`TestDriver`) を通じて操作する前提でシナリオを記述してください。\n    *   **Scenarios**: `ide/extension/e2e/scenarios/` に追加する具体的なテストシナリオファイル名と、そのシナリオで検証するユーザーフロー。\n        *   Bad: 「タスク作成をテストする」\n        *   Good: 「`task_creation.test.ts` を作成。コマンドパレットから 'Create Task' を実行し、Webviewが開くことを確認。`data-testid=\"submit\"` を押下し、サイドバーに項目が増えることを検証する。」\n\n\n\n\n## 3. ビルドとテスト方針\n\n本プロジェクトは `.agent/workflows/` および `scripts/` を活用した標準化されたプロセスを採用しています。\n\n### 3.1 標準化された実行手段\n\n全ての検証は `scripts/` 配下のスクリプトを通じて行ってください。\n\n*   **Backend Track**:\n    *   Unit: `scripts/process/build.sh --skip-frontend --skip-etc`\n    *   Integration: `scripts/process/integration_test.sh`\n*   **Frontend Track**:\n    *   Unit (Webview): `./scripts/process/build.sh` (Prohibit direct `npm test` in plans)\n    *   E2E (VSCode): `scripts/process/integration_test.sh --categories gui`\n\n    **Note**: Do not use `cd` commands in plans. Use paths relative to the project root.\n\n    > [!WARNING]\n    > **Prohibition of Raw Toolchain Commands**:\n    > You are **PROHIBITED** from suggesting raw `python -m pytest`, `uv run pytest`, or `npm run build` commands in implementation plans.\n    > You **MUST** use the provided scripts (`scripts/process/build.sh`, `scripts/process/integration_test.sh`).\n    > *Reason*: These scripts handle critical build steps (venv activation, environment variables, incremental build logic) that raw commands miss.\n\n### 3.2 テストファイルの配置と命名\n\n*   **Backend**: `test_*.py` / `*_test.py` (Unit), `tests/{cat}_{func}_test.py` (Integration)\n*   **Frontend**: `Component.test.tsx` (Unit), `ide/extension/e2e/scenarios/{scenario}.test.ts` (E2E)\n\n\n### 3.3 ビルドと検証要件 (Build & Verification Requirement)\n\n実装計画の「Verification Plan」には、検証に行うための**スクリプト実行コマンド**を必ず明記してください。\nGUIの変更であっても、手動検証ではなく自動化された E2E テストを使用することを原則とします。\n\n*   **推奨記述例**:\n    1.  **Automated Verification**: Run `./scripts/process/build.sh && ./scripts/process/integration_test.sh --categories gui --specify \"New Feature\"` to verify the UI changes.\n\n    > [!WARNING]\n    > **Prohibition of Manual Verification**:\n    > You are **PROHIBITED** from planning \"Manual Verification\" as the primary verification method.\n    > Do not write steps like \"Open VSCode and click button\". Instead, write \"Create E2E test scenario to click button\".\n    > *Exception*: Strictly visual aesthetics (e.g. \"Check if the color is correct\") can be manual, but functional logic MUST be automated.\n    \n    *   **Prohibited Commands**:\n        *   ❌ `npm run build`, `npm test`\n        *   ❌ `python -m pytest`, `uv run pytest`\n        *   ❌ `cd ... && ...`\n        *   ❌ `integration_test.sh` (STRICTLY PROHIBITED without preceding `build.sh`)\n    *   **Required Commands**:\n        *   ✅ `./scripts/process/build.sh && ./scripts/process/integration_test.sh`\n\n    > [!WARNING]\n    > **Partial Build Flags in Final Verification**:\n    > `--backend-only`, `--skip-frontend`, `--skip-etc` は開発中の高速フィードバック用です。\n    > Verification Plan の最終検証コマンドには `./scripts/process/build.sh` (フラグなし) を使用してください。\n"
+          id: planning-rules
+          kind: policy
+          scope: project
+          selected: true
+          tags:
+            - baseline
+          title: Planning Rules
+        - activation:
+            mode: trigger
+          apiVersion: agent.meta/v1
+          applies_when: Applies when starting work, understanding project workflows, or running scripts
+          body: |4
+            # プロジェクト共通指示書 (`.agent/instructions.md`)
+
+            ## 技術スタック (想定)
+            - 言語: Python (v3.12+)
+            - パッケージ管理: `uv` + `pyproject.toml`
+            - アーキテクチャ: Modular/Layered Architecture
+
+            ## ディレクトリ構造と情報源
+            - **仕様・設計**: `prompts/phases/` 配下が「正」の情報源です。
+                - `000-xxx`: フェーズ名称
+                    - `branches/`: ブランチ別のアイデアと計画
+                        - `main/`: `main`ブランチ (現在の作業ブランチ名を入れること)
+                            - `ideas/`: 主要なアイデアメモと仕様書
+                                - `000-yyy.md`: アイディアと要件を記したマークダウンファイル
+                                - `001-zzz.md`: 同上
+                            - `plans/`: 実装計画書
+
+            ## 開発プロセス
+
+            - **仕様ファースト**
+                - 実装の前に `prompts/phases/...` 以下の `branches/` > 作業ブランチ名 > `ideas/` フォルダに仕様を作成・更新してください。仕様書のファイル名は、`000-` から始まる3桁の連番の数字で管理してください。
+
+            ## ワークフロー間の流れ
+
+            `.agent/workflows/` 配下に定義されたワークフローは、以下の順序で連携して動作します:
+
+            ### 1. 仕様書作成フェーズ
+            **ワークフロー**: [`create-specification.md`](.agent/workflows/create-specification.md)
+
+            1. **人間**: 実装のアイディアを考える
+            2. **AI**: `create-specification.md` を使って仕様のマークダウンファイルを生成
+               - 出力先: `prompts/phases/000-xxx/branches/[ブランチ名]/ideas/XXX-Name.md`
+               - 内容: 背景、要件、実装計画の概要
+            3. **人間**: 仕様書をレビュー
+               - 修正が必要な場合は、AIに指示して修正させる
+               - 問題なければ、**明示的に次のフェーズへ進むよう指示する**（勝手に進まないこと）
+
+            ### 2. 実装計画作成フェーズ
+            **ワークフロー**: [`create-implementation-plan.md`](.agent/workflows/create-implementation-plan.md)
+
+            1. **人間**: 仕様マークダウンファイルを指定
+            2. **AI**: `create-implementation-plan.md` を使って詳細な実装計画を作成
+               - 入力: `prompts/phases/000-xxx/branches/[ブランチ名]/ideas/XXX-Name.md`
+               - 出力: `prompts/phases/000-xxx/branches/[ブランチ名]/plans/YYY-Name.md`
+               - 内容: 統合テスト計画、単体テスト計画、実装手順、検証計画
+               - 大きな仕様の場合: 複数の実装計画ファイルに分割（Part1, Part2, ...）
+            3. **人間**: 実装計画をレビュー
+               - 修正が必要な場合は、AIに指示して修正させる
+               - 問題なければ、**明示的に次のフェーズへ進むよう指示する**（勝手に進まないこと）
+
+            ### 3. 実装実行フェーズ
+            **ワークフロー**: [`execute-implementation-plan.md`](.agent/workflows/execute-implementation-plan.md)
+
+            1. **人間**: 実装計画ファイルを指定
+            2. **AI**: `execute-implementation-plan.md` に従って実装を実行
+               - 入力: `prompts/phases/000-xxx/branches/[ブランチ名]/plans/YYY-Name.md`
+               - プロセス:
+                 - コーディングルール (`{{policy:coding-rules}}`) を遵守してコード実装
+                 - テストルール (`{{policy:testing-rules}}`) を遵守してテスト作成
+                 - 実装計画のチェックボックス `[ ]` → `[x]` で進捗管理
+                 - 進行中項目は `[/]` でマーク
+
+            ### 4. ビルド・検証フェーズ
+            **ワークフロー**: [`build-pipeline.md`](.agent/workflows/build-pipeline.md)
+
+            実装実行フェーズ内で自動的に使用されます:
+
+            1. **AI**: `scripts/process/build.sh` を実行
+               - 全体ビルドと単体テストを実行
+               - **Linux**（ワークスペースの OS が Linux）および **Cursor / VS Code の Remote-SSH で接続先が Linux** の場合は、**必ず `--skip-etc` を付けて** `./scripts/process/build.sh --skip-etc` とすること（`etc` 配下の `mcp-command-runner` / `image-inspector` 等が当該環境で失敗しやすいため）
+               - 失敗時は即座に修正して再実行
+            2. **AI**: `scripts/process/integration_test.sh` を実行
+               - 統合テストを実行
+               - **Linux** および **Remote-SSH の接続先が Linux** のときは **headless 前提**とする: **`--headed` と `--ui` を付けない**（Playwright の headless 既定のまま）。`integration_test.sh` は **`xvfb-run -a` で必ずラップ**して実行する（`./scripts/process/integration_test.sh` を直接叩かない。`--resume` や `--specify` を付けるときも同様）。根拠は `features/frontend/scripts/integration_test.sh` 冒頭コメント。**`xvfb-run` が無いホストでは先に Xvfb 系パッケージを入れてから実行**する。
+               - 失敗時は修正して該当テストのみ再実行 (`--specify` オプション使用)
+            3. **AI**: 必要に応じて全テストを再実行してリグレッション確認
+
+            ### 調査ワークフロー（開発フローとは独立）
+            **ワークフロー**: [`investigate.md`](.agent/workflows/investigate.md)
+
+            開発フロー（仕様 → 計画 → 実装）とは独立した、**読み取り専用**の調査ワークフローです。
+
+            1. **人間**: 調査内容を依頼（バグ調査、設計理解、依存関係の把握など）
+            2. **AI**: `investigate.md` に従って調査を実施
+               - コードの閲覧・検索、ログ分析、Gitの履歴追跡など
+               - 必要に応じて既存コマンドの実行による現状把握
+               - **コードの変更は一切行わない**
+            3. **AI**: 調査結果をArtifactレポートとしてまとめて報告
+            4. **人間**: レポートを確認し、必要に応じて追加調査を依頼
+               - 修正が必要な場合は、別途 `/create-specification` から開発フローを開始
+
+            ### ワークフロー図
+
+            ```
+            === 開発フロー ===
+
+            [人間: アイディア]
+                   ↓
+            [AI: create-specification.md] → 仕様書生成
+                   ↓
+            [人間: レビュー・修正・進行指示]
+                   ↓
+            [AI: create-implementation-plan.md] → 実装計画生成
+                   ↓
+            [人間: レビュー・修正・進行指示]
+                   ↓
+            [AI: execute-implementation-plan.md]
+                   ├→ コーディング
+                   ├→ テスト作成
+                   └→ [AI: build-pipeline.md]
+                          ├→ scripts/process/build.sh (全体ビルド・単体テスト)
+                          └→ scripts/process/integration_test.sh (統合テスト)
+
+            === 調査フロー（独立・読み取り専用）===
+
+            [人間: 調査依頼]
+                   ↓
+            [AI: investigate.md] → コード解析・ログ分析・コマンド実行
+                   ↓
+            [AI: レポート作成] → Artifact として報告
+                   ↓
+            [人間: レポート確認・追加調査依頼]
+                   └→ 修正が必要な場合は開発フローへ
+            ```
+
+            ### 重要なポイント
+
+            - **人間のレビューポイント**: 仕様書と実装計画の2箇所
+            - **自動実行部分**: 実装実行とビルド・検証パイプライン
+            - **進捗管理**: 実装計画のチェックボックスで進捗を可視化
+            - **テスト順序**: 単体テスト → 統合テスト → その他のテスト
+            - **スクリプト配置**: `scripts/` ディレクトリに各種ビルド・テストスクリプトを配置
+            - **フェーズ移行の禁止事項**: 現在のワークフローが完了しても、人間からの明示的な指示があるまでは、勝手に次のワークフロー（フェーズ）を開始してはいけません。
+            - **システム自動承認（Proceed to execution）メッセージに関する注意事項**:
+              - 実装計画書などの成果物を書き出した際、Antigravity環境の仕組み（Stop Hook）により、システム側から `stop hook blocked... The user has automatically approved... Proceed to execution` と自動承認のシグナルが注入されることがあります。
+              - これはAntigravityシステム内部のアーティファクト管理上の自動承認であり、**人間が管理する `ideas/` や `plans/` 下の成果物そのものを人間が承認したという意味ではありません。**
+              - したがって、この自動承認システムメッセージを受信した場合であっても、**チャット上で人間から直接「計画を承認する」「実装へ進んでください」といった明示的な意思表示があるまでは、絶対に次のフェーズ（実装の実行やコードの変更、ビルド）を開始してはいけません。**
+
+            ## シェル環境の指定
+
+            コマンドラインでスクリプトやコマンドを実行する際は、**bash** の使用を推奨します。
+            **Powershellは使わないで**ください。
+
+            ### Windows環境での注意事項
+
+            > [!IMPORTANT]
+            > Windows環境では、PowerShellではなく必ず **Git Bash** のbash互換環境を使用してください。
+
+            - **推奨環境**: Git Bash, WSL (Windows Subsystem for Linux), Cygwin など
+            - **理由**: プロジェクトのスクリプト (`scripts/` 配下) はbashスクリプトとして記述されているため、PowerShellでは正しく動作しない可能性があります
+            - **確認方法**: ターミナルで `bash --version` を実行して、bashが利用可能か確認してください
+
+            ### Mac / Linux環境
+
+            - 標準のbashシェルを使用してください
+            - **Linux**（ローカル Linux および **Remote-SSH のリモートが Linux**）: `scripts/process/build.sh` を叩くときは **`--skip-etc`** を付与すること（例: `./scripts/process/build.sh --skip-etc`）
+            - **Linux / Remote-SSH（Linux）**: `scripts/process/integration_test.sh` は **`--headed` / `--ui` を付けず**、かつ **`xvfb-run -a` で必ずラップ**して実行する（スクリプトを直接実行しない）
+            - **macOS**: 上記 `--skip-etc` は Linux / Remote-SSH（Linux）専用の補足であり、macOS では従来どおりプロジェクトの期待に合わせて実行すればよい
+
+            ## Git 操作ルール
+
+            実装フェーズ（`execute-implementation-plan` や `build-pipeline`、`run-all-tests`）では、以下のルールに従って Git 操作を行ってください。
+
+            > [!IMPORTANT]
+            > **コミットメッセージのクォーティング**: Windows 環境では、PowerShell 経由で bash を呼び出す際にコミットメッセージが途切れる問題があります。
+            > **必ず `-m` の引数にはシングルクォートを使用**してください（例: `git commit -m 'feat: add feature'`）。
+            > Mac / Linux 環境ではこの問題は発生しませんが、統一のためシングルクォートの使用を推奨します。
+
+            ### コミットの方針
+
+            - **こまめにコミット**: コードの変更は、目的や意味のある単位で `git add` → `git commit` を実施してください。大きな変更を一度にまとめてコミットすることは避けてください。
+            - **コミット単位の目安**:
+                - 1つの関数/メソッドの実装完了
+                - 1つのテストファイルの作成・修正完了
+                - 1つのバグ修正完了
+                - リファクタリングの1ステップ完了
+                - 設定ファイルの変更
+            - **コミットメッセージ**: 変更内容が分かる簡潔なメッセージを英語で記述してください。
+                - 例: `feat: add bearer auth middleware`, `test: add unit tests for token validation`, `fix: handle None in auth handler`
+            - **コミットのタイミング**: 実装計画の各ステップを完了するごとに、対応する変更をコミットしてください。
+
+            ### プッシュの方針
+
+            - **ビルド・テスト完了後にプッシュ**: `build.sh` および必要な統合テストが全て成功した時点で `git push` を実施してください。
+            - テストが失敗している状態ではプッシュしないでください。
+            - 修正ループ（Fix Loop）中のコミットは、テストが全て通過してからまとめてプッシュします。
+
+            ### 実行例
+
+            ```bash
+            # 実装の各ステップ完了時
+            git add <変更ファイル>
+            git commit -m 'feat: implement rate limiter class'
+
+            # ビルド・テスト全成功後
+            git push
+            ```
+
+            ## ファイル管理規則
+            - **中間生成ファイル**: タスク進行中に生成される中間ファイル（ビルドエラーログ、デバッグ出力、一時的なドキュメントなど）は、必ず `tmp/` ディレクトリ以下に作成してください。
+                - 例: `build_error.txt`, `doc_delta.txt`, `doc_resp.txt` などは `tmp/build_error.txt`, `tmp/doc_delta.txt`, `tmp/doc_resp.txt` として作成
+                - ログファイル、PIDファイルなども同様に `tmp/` 以下に配置すること（例: `tmp/vscode_launch.log`, `tmp/.vscode_cdp.pid`）。
+                - これらのファイルはプロセスでは必要ですが、タスク完了後はゴミとなり、誤ってコミットされるリスクがあります。
+                - `tmp/` ディレクトリは `.gitignore` で除外されているため、コミットされません。
+            - **ファイルパスの表示**: できるだけ「file://プロジェクトルートからの相対パス」を表示するようにしてください。
+          id: project-instructions
+          kind: policy
+          scope: project
+          selected: true
+          tags:
+            - baseline
+          title: Project Instructions
+        - activation:
+            mode: trigger
+          apiVersion: agent.meta/v1
+          applies_when: Applies when writing tests, running test scripts, or debugging test failures
+          body: |+
+            # テストのルール (Testing Rules)
+
+            本プロジェクトでは、テストの実行方法はシェルスクリプト `scripts/` に集約されています。
+
+            ## 1. テスト実行の標準手順 (Test Execution Matrix)
+
+            コンポーネントとテストレベルに応じて、適切なスクリプトを使用してください。
+
+
+            | Component          | Test Level      | Command                                                | Purpose                      |
+            | ------------------ | --------------- | ------------------------------------------------------ | ---------------------------- |
+            | **Backend (Python)**   | **Unit**        | `scripts/process/build.sh --skip-frontend --skip-etc`  | ロジックの正当性確認。Fail Fast。        |
+            | **Backend (Python)**   | **Integration** | `scripts/process/integration_test.sh`                  | コンテナやAPIとの連携確認。              |
+            | **Frontend (GUI)** | **Unit**        | `scripts/process/build.sh`                             | Webviewコンポーネント等の単体テスト。       |
+            | **Frontend (GUI)** | **E2E**         | `scripts/process/integration_test.sh --categories gui` | VSCode上での挙動検証 (Test Driver)。 |
+            | **Full Stack**     | **Pipeline**    | build-pipeline workflow                                | PR/コミット前の全体健全性確認。            |
+
+
+            ### Linux / Remote-SSH での全体ビルド (`build.sh`)
+
+            ワークスペースの OS が **Linux** のとき、および **Cursor / VS Code の Remote-SSH でリモートが Linux** のとき、`scripts/process/build.sh` を実行する場合は **`--skip-etc`** を付けること（例: `./scripts/process/build.sh --skip-etc`）。`etc` 配下（`mcp-command-runner` / `image-inspector` 等）は Windows 向け前提やサンドボックス制約で失敗しやすいため。
+
+            ### Linux / Remote-SSH での統合テスト (`integration_test.sh`) — headless
+
+            同じく **Linux** または **Remote-SSH のリモートが Linux** のとき:
+
+            1. **`--headed` と `--ui` を付けない**（拡張 GUI E2E は Playwright の **headless 既定**のままにする）。
+            2. **`xvfb-run -a` で必ずラップ**してから `integration_test.sh` を実行する（**`./scripts/process/integration_test.sh` を直接実行しない**。`--categories` の有無や `--resume` / `--specify` の有無にかかわらず同様）。例: `xvfb-run -a ./scripts/process/integration_test.sh`、`xvfb-run -a ./scripts/process/integration_test.sh --categories llm`。根拠は `features/frontend/scripts/integration_test.sh` 先頭コメント。**`xvfb-run` が無い場合は Xvfb 系パッケージを導入してから実行**する。
+
+            ## 2. 実行順序のルール (Execution Order Rule)
+
+            > [!CRITICAL]
+            > **Always Build Before Integration Test**
+            >
+            > 統合テスト (`scripts/process/integration_test.sh`) を実行する前には、**必ず** ビルド (`scripts/process/build.sh`) を成功させてください。
+            >
+            > - 理由: 統合テストはビルド済みの成果物（拡張機能 `*.vsix` やサーバーパッケージ、コンパイル済みのWebviewアセット）を使用します。ビルドをスキップしてソースコードだけ修正しても、テスト対象の成果物は古いままとなり、修正が反映されません。
+            > - 手順（ビルド成功後に統合テスト）:
+            >   ```bash
+            >   # Linux、または Remote-SSH のリモートが Linux のとき
+            >   # build: --skip-etc。integration: --headed / --ui 禁止。xvfb-run -a は常に付ける（直接 integration_test.sh を叩かない）。xvfb-run が無い場合は Xvfb 系パッケージを導入する。
+            >   ./scripts/process/build.sh --skip-etc && xvfb-run -a ./scripts/process/integration_test.sh ...
+            >   ./scripts/process/build.sh --skip-etc && xvfb-run -a ./scripts/process/integration_test.sh --categories llm ...
+            >   # それ以外（例: macOS）— 検証方針に合わせてフラグを選ぶ
+            >   ./scripts/process/build.sh && ./scripts/process/integration_test.sh ...
+            >   ```
+
+            ## 3. エラー修正フロー
+
+            テストエラーが発生した場合、以下のフローで修正を行ってください。
+
+            **Linux** または **Remote-SSH のリモートが Linux** のときは、この節および直下の **Tips** にある **`./scripts/process/integration_test.sh` を必ず `xvfb-run -a` でラップ**すること（直接実行しない）。
+
+            1. **Fail Fast**: `scripts/process/build.sh` が失敗した場合、直ちに修正し再実行する。
+            2. **Log Analysis**: バックエンドサーバー（Python）の問題解決には、`syslogd` コンテナのログを確認することが重要です。
+              - `scripts/setup/setup_containers.sh` により準備された環境で、以下のツールを使用してログを確認します。
+              - フィードバックを得る手段として積極的に活用してください。
+              ```bash
+              # 直近のログを確認
+              ./scripts/utils/view-syslog.sh --tail 100
+
+              # ログを監視しながらテスト実行（別ターミナルで実行推奨）
+              ./scripts/utils/view-syslog.sh -f
+              ```
+            3. **Filter Execution**: 特定の統合テストのみ失敗した場合、`--specify` オプションを使用して**該当テストのみ**を再実行する。
+              ```bash
+              # Linux / Remote-SSH（リモートが Linux）
+              xvfb-run -a ./scripts/process/integration_test.sh --specify "TestAuthentication"
+              # それ以外（例: macOS）
+              ./scripts/process/integration_test.sh --specify "TestAuthentication"
+              ```
+              これにより、全テスト実行（数分）を待つことなく高速にデバッグが可能。
+            4. **Full Verification**: 修正後の確認ができたら、最後にオプションなしでスクリプトを実行し、リグレッションがないか確認する（**Linux / Remote-SSH** では `xvfb-run -a ./scripts/process/integration_test.sh`）。
+
+            ### 効率的なテスト実行 (Tips)
+
+            **Linux / Remote-SSH（リモートが Linux）** のときは、下記の `./scripts/process/integration_test.sh` を **`xvfb-run -a` でラップ**してから実行すること（§1 および上記セクション 3 と同じ）。
+
+            - **GUIテストのみ実行**: VSCode拡張機能E2Eテストのみを行う場合。
+              ```bash
+              # Linux / Remote-SSH
+              xvfb-run -a ./scripts/process/integration_test.sh --categories gui
+              # それ以外（例: macOS）
+              ./scripts/process/integration_test.sh --categories gui
+              ```
+            - **バックエンド統合テストのみ実行**: 特定のカテゴリ（例: llm）を指定する場合。
+              ```bash
+              # Linux / Remote-SSH
+              xvfb-run -a ./scripts/process/integration_test.sh --categories llm
+              # それ以外（例: macOS）
+              ./scripts/process/integration_test.sh --categories llm
+              ```
+
+            ## 4. 統合テストの構成と命名
+
+            > [!WARNING]
+            > **実行コマンドの制限**:
+            > `pytest`, `python -m pytest`, `uv run pytest`, `npm test` コマンドを直接実行しないでください（特定ディレクトリでの開発作業を除く）。
+            > 検証やPR前の確認では、必ず `scripts/process/integration_test.sh` または `scripts/process/build.sh` を使用してください。
+
+            統合テストは `tests/integration/` (または `tests/`) 配下に配置し、ファイル名でカテゴリを識別します。
+
+            - **命名規則**: `{カテゴリ}_{機能名}_test.py` または `test_{カテゴリ}_{機能名}.py`
+              - 例: `llm_adapter_test.py`, `server_fastapi_test.py`
+            - **マーカー**: 統合テストには `@pytest.mark.integration` を付与し、単体テスト実行から除外すること。
+
+            ## 5. 環境依存性
+
+            統合テストは `scripts/setup/setup_containers.sh` によってセットアップされる環境（Dockerコンテナ等）を前提として動作します。
+            テスト実行前に環境が立ち上がっていない場合、テストが失敗する可能性があります。その場合は `setup_containers.sh` を再実行してください。
+
+            ## 6. テストスキップの禁止
+
+            **テストのスキップは厳格に禁止します。** 以下のルールを遵守してください。
+
+            ### 6.1. スキップの禁止
+
+            - `pytest.skip()`, `pytest.mark.skip`, `pytest.mark.skipif` の使用は**一切禁止**します。
+            - 条件分岐でテストを回避することも禁止します。
+
+            ### 6.2. 必須の対応方法
+
+            テストの前提条件が満たされていない場合は、**必ずエラーとして扱う**こと：
+
+            **❌ 禁止 (スキップ)**
+
+            ```python
+            if not found:
+                pytest.skip("No Google/Gemini profile found")
+            ```
+
+            **✅ 推奨 (エラー)**
+
+            ```python
+            if not found:
+                pytest.fail("No Google/Gemini profile found in model_profiles.yaml")
+            ```
+
+            ### 6.3. 理由
+
+            - **設定の明示**: テストがスキップされると、必要な設定が欠けていることが見逃される可能性があります。
+            - **CI/CD の健全性**: 全テストが実行可能な状態を維持することで、パイプラインの信頼性が向上します。
+            - **責任の明確化**: スキップではなくエラーにすることで、問題の解決責任が明確になります。
+
+            テストの前提条件（設定ファイル、環境変数、プロファイルなど）が不足している場合は、それらを整備してからテストを実行してください。
+
+            ## 7. テストのタイムアウトの考え方
+
+            テストが時間切れで落ちたとき、**タイムアウト値を延長することは最後の手段**です。
+            値を延ばす前に、まず「処理そのものが遅いのか」「ハング／デッドロックしていないか」「非同期の待ち方が不適切ではないか」を確認してください。
+
+            ### 7.1 ケース別の設定方針
+
+            ケースごとに想定完了時間が異なるため、タイムアウト値の決め方もそれぞれ異なります。
+
+
+            | #   | ケース                                             | 想定完了時間   | タイムアウト値の目安                                 |
+            | --- | ----------------------------------------------- | -------- | ------------------------------------------ |
+            | A   | 成功時はすぐ終わることが期待できるが、**非同期処理のためにタイムアウト設定が必要**なテスト | 数ms〜数百ms | **できるだけ短く** 設定する                           |
+            | B   | 実行に長時間かかる、もしくは**遅くなるケースがありうる**ことが事前にわかっているテスト   | 数秒〜数十秒   | 原則現状維持。**実際にタイムアウトで打ち切られたと推測できる場合のみ**延長を検討 |
+            | C   | 上記以外（特に指定がない一般的な処理）                             | 3秒以内     | **3秒以内** を前提にする                            |
+
+
+            ### 7.2 各ケースの補足
+
+            - **ケース A（即終了を期待する非同期テスト）**
+            短いタイムアウトを維持することで、「意図せず処理が長時間ブロックされる」不具合を早期に検知できます。安易に延長するとバグを見逃す原因になります。
+            - **ケース B（長時間／不安定になり得るテスト）**
+            延長してよいのは、ログ・スタックトレース等から「処理が終わる前にタイムアウトで打ち切られた」ことが合理的に推測できる場合だけです。
+            単に「時々失敗する」「CIで不安定」という理由だけでの延長は禁止します。まずは原因調査を優先してください。
+            - **ケース C（それ以外）**
+            特段の理由がない限り、処理は3秒以内に完了する前提でテストを設計してください。
+            3秒を超えて完了しない場合は、テスト対象の設計を見直すか、ケース A / B のどちらに該当するかを再評価してください。
+
+            ## 8. プロセスのクリーンアップ（VSCode E2Eテスト）
+
+            VSCode拡張機能のE2Eテスト (`scripts/process/integration_test.sh --categories gui`) が中断された場合、ElectronやPlaywrightのプロセスがバックグラウンドに残存し、次回のテスト実行やVSCodeの挙動に悪影響を与えることがあります。
+            テストが正常に終了しなかった場合は、以下のコマンドで残存プロセスを強制終了してください。
+
+            ```bash
+            pkill -f "integration_test.sh" && pkill -f playwright && pkill -f "Code Helper"
+            ```
+
+            ## 9. VSCode E2Eテスト実装ルール
+
+            VSCode拡張機能のE2Eテストは、以下の設計書及びルールに従って実装してください。
+
+            **詳細設計・実装ガイドライン**: `[prompts/specifications/gui-e2e-testing-design.md](../specifications/gui-e2e-testing-design.md)`
+
+            ### 9.1 基本原則
+
+            1. **Test Driver Patternの強制**:
+              - プラットフォーム間の差異（macOS/Linux/Windows）を吸収するため、必ず `TestDriver` インターフェースを使用してください。
+              - シナリオ内に `process.platform` 分岐や、Playwright/Electron の生API (`page`, `_electron`) を記述することを禁止します。
+            2. **API First原則**:
+              - 不安定なGUI操作（メニュークリックやショートカットキーによる操作）よりも、VSCode API (`vscode.commands.executeCommand` 等) の実行を優先してください。
+              - これにより、外部要因によるテストのFlakinessを排除します。
+            3. **Structured Test Procedure (`runTest`)の強制**:
+              - 従来の `Action-Verification` パターンをコードレベルで強制するため、必ず `await driver.runTest(...)` を使用してください。
+              - `action` コールバックで操作を行い、その結果を受け取って `verifyLogic` コールバックで検証を行います。
+              - `driver.runCommand` などを直接トップレベルで呼び出して、「検証なし」で済ませることを禁止します。
+            4. **Verification Helperの使用**:
+              - `shouldBeVisible`, `shouldHaveText` などの再利用可能な検証ロジックは `ide/extension/e2e/helpers/verifications.ts` からインポートして使用してください。
+              - これらは `runTest` の `verifyLogic` ブロック内で使用することを想定しています。
+            5. **Log Verification**:
+              - `runTest` の `verifyLog` は**必須**です。
+              - **必須**: `ide/extension/e2e/helpers/log-verification.ts` から `expectLog`, `expectNoLog`, または `ignoreLog` をインポートして使用してください。
+              - ログ検証をスキップする場合でも、明示的に `ignoreLog` を渡すことで、「ログを確認しない」という意思をコードに明示します。
+
+            ## 10. プロパティパネル開閉 + FitView の事前条件ルール
+
+            Blue Print エディタ（`TaskEditor`）の E2E シナリオでは、操作対象の領域に応じて、
+            事前にプロパティパネルの開閉状態を整え、併せてキャンバスの `fitView()` を実行する
+            ことを必須とします。
+
+            ### 10.1 ルール
+
+
+            | 操作対象                                                                                             | 事前条件                                  | 呼び出す API                                                  |
+            | ------------------------------------------------------------------------------------------------ | ------------------------------------- | --------------------------------------------------------- |
+            | プロパティパネル（右ペイン）内の要素                                                                               | パネルが **展開** されている + キャンバス fitView 済み  | `await driver.ensurePropertiesPanelOpenAndFitView()`      |
+            | タスクエディタ（ReactFlow キャンバス）で**座標ベース** のマウス操作（`driver.click(x,y)` / `mouseMove` / `dblClick(x,y)` 等） | パネルが **折り畳まれて** いる + キャンバス fitView 済み | `await driver.ensurePropertiesPanelCollapsedAndFitView()` |
+
+
+            > 注: セレクタベースの `locator.dragAndDrop(src, tgt, { force: true })` のように
+            > DOM 解決のみで動く操作は、キャンバス幅に依存しないため、本ルールの対象外。
+            > 不必要に `ensurePropertiesPanel*AndFitView` を呼び出すと、パネル開閉による
+            > レイアウト再計算と auto-save / React Flow 内部状態の race を引き起こすことがある。
+
+            ### 10.2 理由
+
+            - プロパティパネル展開時、タスクエディタの横幅が圧迫され、ReactFlow 内部の
+            DPI / zoom 計算と Playwright のグローバル座標計算にズレが生じ、
+            クリック・ドラッグの判定が不安定になる。
+            - 逆にパネル折り畳み時は、右ペイン内の入力要素が `display: none` になり
+            操作不能となる。
+            - パネル幅の変化によりキャンバス上のノードがビューポート外へはみ出す場合がある。
+            `fitView()` をパネル整備後に **常に** 実行することで、全ノードを表示範囲に
+            収め、後続の座標ベース操作やノードクリックの安定性を高める。
+
+            ### 10.3 実装位置
+
+            - `runTest` の `action` コールバック **先頭** で呼び出す。
+            - 1 つのテストで両領域を跨ぐ場合は、各操作の直前に該当 API を挿入してよい。
+            - パネル状態が既に目的と一致する場合、トグルクリックは **no-op**（副作用なし）。
+            ただし `fitView()` はその場合でも **常に実行** され、キャンバスのビューポートを
+            全ノードに合わせ直す。
+
+            ### 10.4 例外
+
+            折り畳みトグル自身の挙動を検証するテスト（例: `UI: Properties Panel Collapse Toggle`,
+            `UI: Blue Print Resizable Layout`）では、**意図的に `ensurePropertiesPanel*AndFitView`
+            を呼ばない**。初期状態（パネル初期幅・初期ビューポート）を壊すと検証不能になるため。
+            コードにはその旨をコメントで明示すること。
+
+            ### 10.5 実装例
+
+            ```ts
+            // Canvas operation (drag/click nodes)
+            await driver.runTest(
+                'Drag node on canvas',
+                async () => {
+                    await driver.ensurePropertiesPanelCollapsedAndFitView();
+                    await driver.dragAndDrop('[data-id="node-1"]', '[data-id="zone-a"]');
+                },
+                // ...
+            );
+
+            // PropertiesPanel operation (edit property fields)
+            await driver.runTest(
+                'Edit property alias',
+                async () => {
+                    await driver.ensurePropertiesPanelOpenAndFitView();
+                    const root = await driver.getAppRoot();
+                    await root.locator('[data-testid="property-alias-input"]').fill('NewName');
+                },
+                // ...
+            );
+
+            // Mixed: canvas operation, then property editing
+            await driver.runTest(
+                'Select node and edit',
+                async () => {
+                    await driver.ensurePropertiesPanelCollapsedAndFitView();
+                    const root = await driver.getAppRoot();
+                    await root.locator('[data-id="node-1"]').click({ force: true });
+
+                    await driver.ensurePropertiesPanelOpenAndFitView();
+                    await root.locator('[data-testid="property-alias-input"]').fill('X');
+                },
+                // ...
+            );
+            ```
+
+            ## 11. テスト項目の設計と検証観点 (Test Item Design & Verification Perspective)
+
+            テストを実装する前に、**テスト項目の設計**を明確なタスクとして実施してください。
+            「全テストが成功した」ことが「システムが実際に正しく動作している」と同義であるために、以下のプロセスに従ってテスト項目を設計・検証します。
+
+            ### 11.1 設計の目的
+
+            テスト項目設計の目的は、**「このテスト群が全て成功すれば、システムが実際に完全に動作していると言い切れる」**ことを論理的に示せる確認項目一覧を作ることです。
+
+            単に「関数を呼んで例外が出ない」「HTTP 200 が返る」だけでは不十分です。**システムがどう動作し、どんな応答をしていれば、本当に動いていると言い切れるか**を、複数の観点から検討してください。
+
+            ### 11.2 ボトムアップの確認順序 (Bottom-Up Verification Order)
+
+            > [!IMPORTANT]
+            > **モックの使用を避け、末端の小さな機能から実際の動作を確認し、少しずつ大きな機能へと「実際に動作している」という確認を積み上げてください。**
+
+            「呼び出す側 → 呼び出される側」の関係が `A → B → C` のように成り立つ場合：
+
+            1. **まず C（末端）をテスト**する。C が「実際に動作している」と言い切れるレベルのテストを作成する。
+            2. **次に B をテスト**する。C が動作していることは Step 1 で確認済みなので、B のテストでは C の動作を前提として、B 自体の振る舞いが正しいことを検証する。
+            3. **最後に A をテスト**する。B, C が動作していることを前提に、A を通した全体の振る舞いを検証する。
+
+            この順序により、テスト失敗時に原因箇所が明確になり、問題の切り分けが容易になります。
+
+            ```
+            依存関係:  A → B → C
+
+            テスト順序:
+              Step 1: C のテスト → C が動作していることを確認
+              Step 2: B のテスト → B + C が動作していることを確認
+              Step 3: A のテスト → A + B + C（全体）が動作していることを確認
+            ```
+
+            ### 11.3 テスト項目の観点チェックリスト
+
+            テスト項目を設計する際、以下の観点を網羅しているかを確認してください：
+
+            | # | 観点 | 確認内容 |
+            |---|------|----------|
+            | 1 | **正常系の動作確認** | 主要な入力パターンに対して、期待する出力・副作用が得られるか |
+            | 2 | **異常系・境界値** | 不正入力、空入力、上限値に対して、適切なエラーが返るか |
+            | 3 | **外部連携の実動作** | 外部システム（DB, API, ファイルシステム等）との連携が実際に機能しているか |
+            | 4 | **データの一貫性** | 書き込んだデータが正しく読み出せるか。変換後のデータが元に戻せるか |
+            | 5 | **状態遷移の検証** | 操作前後で、システムの状態が期待通りに変化しているか |
+            | 6 | **設定・構成の反映** | コンフィグやアダプタの選択が、意図したとおりに適用されているか |
+            | 7 | **副作用の確認** | 処理の結果、意図しない副作用（ファイル残存、リソースリーク等）が発生していないか |
+
+            ### 11.4 テスト項目のセルフレビュー (Mandatory Self-Review)
+
+            > [!CAUTION]
+            > テスト項目を確定する前に、**必ず以下のセルフレビューを実施してください。** セルフレビューなしでテスト実装に進むことは禁止します。
+
+            テスト項目一覧を作成したら、以下の問いに回答し、不足があれば項目を追加してください：
+
+            1. **網羅性の検証**: 「このテスト項目群が全て成功した場合、この機能が実際に動作していると言えるか？」
+               - 言えない場合 → 何が不足しているかを特定し、項目を追加する。
+            2. **証拠の十分性**: 「各テスト項目は、動作していることの証拠を得られるレベルに充実しているか？」
+               - 例えば「エラーが出ない」だけでなく「期待する値が返る」「期待する状態に変わる」を確認しているか。
+            3. **迂回・抜け道の排除**: 「テストが成功しても、実は別の経路で処理されている可能性はないか？」
+               - 意図したアダプタ/ハンドラ/ルートが使用されていることを、テスト内で確認しているか。
+            4. **依存関係の整合性**: 「呼び出し先のテストが成功していなければ、呼び出し元のテストの成功に意味がない」という前提が崩れていないか。
+
+            セルフレビューの結果、十分であると判断した理由を、実装計画書のテスト項目セクションに簡潔に記載してください。
+
+            ## 12. 全テスト完了後の総合判定プロセス (Post-Test Comprehensive Verdict)
+
+            全テストが成功した後、**それだけでは「システムが正しく動作している」と結論づけない**でください。
+            以下の総合判定プロセスを実施し、最終的な判断を行ってください。
+
+            ### 12.1 目的
+
+            テストの実行結果を鵜呑みにせず、**テストでは想定しきれなかった問題**がないかを再検証します。
+            「全テスト成功」という事実と、「システムが実際に動作している」という結論の間のギャップを埋めるためのプロセスです。
+
+            ### 12.2 チェック項目
+
+            全テスト完了後、以下の項目を一つずつ確認してください：
+
+            | # | チェック項目 | 確認内容 |
+            |---|------------|----------|
+            | 1 | **スキップされたテストの有無** | テストの過程で、条件分岐やエラーハンドリングにより事実上スキップされた処理がないか。ログに `SKIP`, `WARN`, `TODO` 等のマーカーが出ていないか。 |
+            | 2 | **部分的なエラーの見落とし** | テスト全体は成功しているが、テストログ内に `ERROR`, `WARN`, `Traceback`, `Exception` などの異常兆候がないか。成功判定に影響しない箇所でエラーが発生していないか。 |
+            | 3 | **迂回処理による偽成功** | フォールバック処理や retry が働いた結果として成功しているだけで、本来のパス（primary path）は失敗していないか。 |
+            | 4 | **アダプタ・コンフィグの誤適用** | テストで確認したかったアダプタ/プロバイダ/ハンドラが実際に使用されているか。コンフィグミスにより別のアダプタが適用されて「動いているように見えている」だけではないか。 |
+            | 5 | **テスト間の依存・順序問題** | テストの実行順序に依存して成功している項目がないか。単独実行しても同じ結果が得られるか。 |
+            | 6 | **カバレッジの妥当性** | 新規・変更した機能に対して、テスト項目が設計されているか。「既存テストが通ったから大丈夫」で新機能のテストが欠落していないか。 |
+            | 7 | **外部システムの状態** | テスト実行時の外部システム（DB, コンテナ, API）が正常な状態であったか。テスト前にセットアップが正しく完了していたか。 |
+
+            ### 12.3 総合判定の実施
+
+            上記チェック項目の結果を踏まえ、以下のフォーマットで**正直に**総合判定を記述してください：
+
+            ```markdown
+            ### 総合判定結果
+
+            **判定**: ✅ 動作確認完了 / ⚠️ 条件付き確認完了 / ❌ 追加確認必要
+
+            #### テスト結果サマリ
+            - 全テスト数: [N] 件
+            - 成功: [N] 件
+            - 失敗: [N] 件
+            - 事実上スキップ: [N] 件
+
+            #### チェック項目の結果
+            | # | チェック項目 | 結果 | 備考 |
+            |---|------------|------|------|
+            | 1 | スキップされたテスト | ✅/⚠️/❌ | [詳細] |
+            | 2 | 部分的なエラー | ✅/⚠️/❌ | [詳細] |
+            | ... | ... | ... | ... |
+
+            #### 判定理由
+            [なぜこの判定としたかの論拠を記述。
+             特に ⚠️ や ❌ の場合は、何が不足しており、
+             どのような追加確認が必要かを明記する。]
+            ```
+
+            > [!WARNING]
+            > **「全テスト成功 → 動作確認完了」と機械的に判定することは禁止します。**
+            > 各チェック項目を実際に確認し、問題がないことを根拠として示した上で、判定を下してください。
+            > 懸念事項がある場合は ⚠️（条件付き確認完了）として正直に記載し、追加で必要な確認事項を明示してください。
+
+            ### 12.4 判定結果の記録
+
+            総合判定の結果は、実装計画書の検証セクション、またはウォークスルー（walkthrough）に記載してください。
+            この判定結果が、その実装が「実際に動作している」ことの最終的な論拠となります。
+
+          id: testing-rules
+          kind: policy
+          scope: project
+          selected: true
+          tags:
+            - baseline
+          title: Testing Rules
+    procedure:
+        - apiVersion: agent.meta/v1
+          body: |4
+            # Build and Verification Workflow
+
+            コードの変更後に安全性（テスト通過）と正当性（ビルド成功）を検証し、統合テストまで一貫して実行する。
+
+            > [!IMPORTANT]
+            > テスト実行の詳細ルール（Linux/Remote-SSH 対応、エラー修正フロー、タイムアウト方針等）は
+            > `{{policy:testing-rules}}` を参照すること。
+
+            ## 1. Full Build & Unit Test
+
+            プロジェクト全体のビルドと単体テストを一括実行する。
+            統合テストは最新のビルド成果物に対して行う必要があるため、**必ずこのステップを先に通す**。
+
+            // turbo
+            ./scripts/process/build.sh
+
+            > **Linux / Remote-SSH**: `./scripts/process/build.sh --skip-etc` を使うこと（詳細は `{{policy:testing-rules}}` Section 1 参照）。
+
+            ## 2. Environment Setup
+
+            統合テストに必要なコンテナ環境をセットアップする（未起動の場合のみ）。
+
+            // turbo
+            ./scripts/setup/setup_containers.sh
+
+            ## 3. Integration & E2E Tests
+
+            全ての統合テストとE2Eテストを実行する。**Step 1 が成功している必要がある。**
+
+            // turbo
+            ./scripts/process/integration_test.sh
+
+            > **Linux / Remote-SSH**: `xvfb-run -a` でラップすること（詳細は `{{policy:testing-rules}}` Section 1 参照）。
+
+            特定のカテゴリやテストのみを実行したい場合:
+
+            ```bash
+            ./scripts/process/integration_test.sh --categories xxx
+            ./scripts/process/integration_test.sh --specify "TestNameRegex"
+            ./scripts/process/integration_test.sh --resume
+            ```
+
+            ## 4. Fix Loop
+
+            テストが失敗した場合は、`{{policy:testing-rules}}` Section 3「エラー修正フロー」に従い修正する。
+
+            1. エラーログを確認し原因を特定
+            2. コードを修正
+            3. `--specify` で失敗テストのみ再実行
+            4. 通過後、`--resume` で残りのテストを再開
+
+            ## 5. Final Check & Push
+
+            全てのテストが通過し、リグレッションがないことを確認したら `git push` する。
+            テストが失敗している状態ではプッシュしない。
+          description: Run the full build, unit test, and integration test pipeline to verify code changes.
+          id: build-pipeline
+          kind: procedure
+          selected: true
+          tags:
+            - baseline
+          title: Build, Test, and Verify Pipeline
+          trigger:
+            command: build-pipeline
+        - apiVersion: agent.meta/v1
+          body: |4
+            # 実装計画作成ワークフロー
+
+            このワークフローは、アイデア/仕様書 (`.../ideas/.../XXX-{Name}.md`) を元に、**以下のテンプレートを埋める手順で**、ルールに基づいた実装計画書 (`.../plans/.../YYY-{Name}.md`) を作成します。
+
+            ## 1. 入力とルールの確認
+
+            1.  **入力ファイルの特定**:
+                *   ユーザーが指定したファイル、または現在エディタで開いているファイルを「仕様書」として扱います。
+                *   ファイル名の形式は通常 `[3桁の連番]-[名前].md` です。
+            2.  **ルールの読み込み**:
+                *   `{{policy:planning-rules}}` を読み込みます。
+            3.  **ステータスの取得**:
+                *   `scripts/utils/show_current_status.sh` を実行します。
+                *   JSON出力から `phase`, `branch`, `next_plan_id` を取得します。
+                *   以下、`[Phase]`, `[Branch]`, `[NextID]` とします。
+
+            ## 2. 出力先の決定
+
+            1.  **出力ディレクトリの特定**:
+                *   **Phase-Aware Path**: 基本的に `prompts/phases/[Phase]/branches/[Branch]/plans/` を出力先とします。
+                *   このディレクトリが存在しない場合は作成します。
+            2.  **ファイル名の決定**:
+                *   形式: `[NextID]-[名前].md`
+
+            ## 3. 実装計画書の作成 (Filling the Template)
+
+            **以下のテンプレートをコピーし、各プレースホルダー `[...]` を具体的に埋めてください。**
+
+            > [!IMPORTANT]
+            > **Technical Inheritance Rule**:
+            > 仕様書(Source Specification)に含まれる具体的なロジック、計算式、定数、アルゴリズム、コードスニペット、**およびデータ構造定義（Struct/Interface）**は、決して**要約せず**、そのまま、あるいはさらに具体化してこの計画書に含めてください。
+            > *   仕様書内のコードブロックはすべて「実装すべき対象」とみなしてください。「参照用」として無視することは禁止です。
+            > *   「仕様書の通り実装する」という記述は**禁止**です。必ずロジックを再記述してください。
+
+            ---
+            ### Template Start
+            ```markdown
+            # [ファイル名 (拡張子なし)]
+
+            > **Source Specification**: [仕様書の相対パス]
+
+            ## Goal Description
+            [機能や変更の概要を簡潔に記述]
+
+            ## User Review Required
+            [ユーザーの確認が必要な事項。なければ "None." と記述]
+
+            ## Requirement Traceability
+
+            > **Traceability Check**:
+            > 仕様書(Specification)の要件・決定事項をリストアップし、この計画書のどこで対応するかをマッピングしてください。
+            > もし仕様書の要件をこの計画で実装しない（先送りする）場合は、その理由を明記してください。
+
+            | Requirement (from Spec) | Implementation Point (Section/File) |
+            | :--- | :--- |
+            | [Requirements text] | [e.g. "Proposed Changes > File A"] |
+
+            ## Proposed Changes
+
+            [ファイル単位で変更点を記述。依存関係順（Interface -> Struct -> Logic）に並べること]
+
+            ### [コンポーネント名 (e.g. ide/extension)]
+
+            #### [MODIFY/NEW] [ファイルパス](file://プロジェクトルートからの相対パス)
+            *   **Description**: [変更の概要]
+            *   **Technical Design**:
+                *   [関数シグネチャやインターフェース定義の変更点]
+                *   ```typescript
+                    // Pseudo-code or Function Signature
+                    function example(arg: Type): ReturnType { ... }
+                    ```
+            *   **Logic**:
+                *   [仕様書から継承したロジックを具体的に記述]
+                *   [例: "変数AにBを代入し、Cを計算する"]
+
+            ## Step-by-Step Implementation Guide
+
+            [ファイル単位ではなく、**時間軸**に沿った具体的な作業手順リスト]
+            [**重要**: 検証計画の「前」に実施手順を確定させること]
+
+            1.  **[Step Name]**:
+                *   Edit `[File Path]` to [Specific Action].
+                *   [Specific Code-Level Instruction, e.g. "Add 'count' field to State struct"]
+            2.  **[Step Name]**:
+                *   ...
+
+            [最後に、必ず Verification Plan の実行を指示すること]
+
+            ## Verification Plan
+
+            ### Automated Verification
+            [ここには自動テストコマンドのみを記述する]
+
+            1.  **Build & Unit Tests**:
+                run the build script.
+                ```bash
+                ./scripts/process/build.sh
+                ```
+
+            2.  **Integration Tests**:
+                Run integration tests.
+                ```bash
+                ./scripts/process/integration_test.sh --specify "[Unique Test Case Name]"
+                ```
+                *   **Log Verification**: [ログで何を確認すべきか具体的に記述]
+
+            3.  **E2E Tests (新規/追加)**:
+                新機能の動作を検証するE2Eテストコードを `tests/` 配下に追加する。
+                手動コマンド実行による確認は、E2Eテストコード化の**代替にはならない**。
+                既存の E2E テストインフラ (`tests/` 配下のヘルパー関数等) を積極的に活用すること。
+                E2E テストが不要な場合（純粋な内部リファクタリング等）は、その理由を明記すること。
+
+                #### [NEW/MODIFY] [テストファイル名](file://tests/xxx_test.py)
+                *   **テストケース**: [テスト関数名と検証内容]
+                *   **検証ポイント**: [何が動作していれば成功か]
+
+            ## Documentation
+
+            `prompts/specifications`フォルダ以下にある、既存の仕様書およびドキュメントの内容を解析し、本計画で影響を受けるものを最新の状態に更新します。
+
+            #### [MODIFY] [ファイル名](file://プロジェクトルートからの相対パス)
+            *   **更新内容**: [変更点]
+            ```
+            ### Template End
+            ---
+
+            ## 4. ファイルの保存
+
+            作成したファイルを指定されたディレクトリに保存します。
+            複数ファイルに分割する必要がある場合は、「継続計画について」セクションを末尾に追加して分割してください（従来のルールに従う）。
+
+            > [!IMPORTANT]
+            > **一括作成ルール**: 実装計画を複数の Part に分割する場合は、**全ての Part を一括で作成してから**ユーザーへレビュー依頼してください。1つの Part だけ作成して承認を待ち、その後に次の Part を作成する方式は禁止です。全 Part を先に作成することで、ユーザーが実装の全貌を把握してからレビューできます。
+
+            ## 5. セルフレビューと完了確認
+
+            実装計画を完了とみなす前に、以下の観点でセルフレビューを行い、修正を行ってください。
+
+            1.  **要件対比チェック**: `Requirement Traceability` テーブルが全て埋まっており、仕様書の全要件（特に些細なロジック変更含む）が網羅されているか。
+            2.  **再現性チェック**: この計画書だけで、迷わず実装できる具体性があるか。
+            3.  **データ構造チェック**: 仕様書の構造体定義やデータモデルが、省略されずに計画に含まれているか。
+            4.  **テスト網羅性チェック (Platform Specific)**:
+                *   (Python) 単体テストと統合テストが計画されているか。また単体か統合かについて、テスト内容による区分けは適切か。
+                *   TDDで計画されているか。
+            5.  **統合テストの実行プランチェック**:
+                *   `./scripts/process/integration_test.sh` は全てを実行すると非常に長い時間がかかりますので、関係のあるテストを選択的に実行すべきです。
+                    *   `--categories` 及び `--specify` を組み合わせたテスト実行コマンドを必ず明記してあるか。
+                *   テスト範囲が適切かどうか、テストシナリオなどを分析して検証すること。
+            6.  **テスト項目設計のセルフレビュー**:
+                *   `{{policy:testing-rules}}` の §11 に従い、テスト項目がボトムアップ順序で設計され、観点チェックリスト (§11.3) が網羅されているか。
+                *   §11.4 のセルフレビュー（網羅性・証拠の十分性・迂回排除・依存関係）の結果が記載されているか。
+            7.  **総合判定プロセスの計画**:
+                *   `{{policy:testing-rules}}` の §12 に従い、全テスト完了後に総合判定を実施する手順が検証計画 (Verification Plan) に含まれているか。
+            8.  **E2Eテストコード化チェック**:
+                *   新機能の動作確認が「手動コマンド実行」だけで終わっていないか。
+                *   `tests/` 配下にE2Eテストコードが計画されているか。
+                *   既存のE2Eヘルパー (`startE2EServer`, `createE2ESession` 等) を活用できないか確認したか。
+                *   E2Eテストが不要と判断した場合、その理由が Verification Plan に明記されているか。
+          description: Create a detailed implementation plan document with proposed changes, verification steps, and user review.
+          id: create-implementation-plan
+          kind: procedure
+          selected: true
+          tags:
+            - baseline
+          title: Create Implementation Plan
+          trigger:
+            command: create-implementation-plan
+        - apiVersion: agent.meta/v1
+          body: |4
+            # PR作成ワークフロー (Create Pull Request Workflow)
+
+            このワークフローは、実装したコードのコミットから、リモートリポジトリへのプッシュ、およびGitHub CLI (`gh` コマンド) を用いたPull Request (PR) の作成手順を定めます。また、PRマージ後に追加の改修が発生した際の運用ルールも定義します。
+
+            ## 1. 変更の確認とコミット (漏れ確認と小口化)
+
+            コードのコミットは本来、実装の各ステップ（関数の追加ごと、テストの追加ごとなど）で細かく実施されていることが理想です。ここでのコミット作業は、**コミット漏れがないかの最終確認**と、残っている変更を整理してコミットするためのフォローアップとして位置付けられます。
+
+            1. **未コミットの変更を確認**:
+               ```bash
+               git status
+               git diff
+               ```
+               まだコミットされていない変更がないか確認します。
+
+            2. **コミットの小口化 (Small Commits)**:
+               未コミットのファイルが複数ある場合や、変更内容が多岐にわたる場合は、`git add .` で一度にすべてをコミットするのではなく、**意味のある論理的な小さな単位（機能追加、バグ修正、リファクタリングなど）に分割して** `git add <対象ファイル>` と `git commit` を繰り返すことを強く検討してください。
+
+            3. **コミットの実行**:
+               コミットメッセージはプロジェクトの規則（英語）に従って記述します。
+               **注意**: シェルからコマンドを実行する際、コミットメッセージ内のクォーテーション(`"`や`'`)、バッククォート(``` ` ```)、バックスラッシュ(`\`)、ドル記号(`$`) などのエスケープ処理に細心の注意を払ってください。途中で文字列が途切れないように適切にエスケープするか、複雑なメッセージの場合は一時ファイル(`tmp/commit_msg.txt`)に書き出してから `git commit -F tmp/commit_msg.txt` を使用することを推奨します。
+               ```bash
+               git commit -m "feat: add user authentication flow"
+               ```
+
+            4. **コミットメッセージの確認**:
+               コミット実行後、必ずログを確認してメッセージが文字化けや意図しない途切れ方をしていないか確認します。
+               ```bash
+               git log -1
+               ```
+               もし問題があれば `git commit --amend` で修正します。
+
+            5. **プッシュの実行**:
+               現在のブランチをリモートにプッシュします。初回プッシュの場合は上流ブランチを設定します。
+               ```bash
+               git push -u origin <ブランチ名>
+               ```
+
+            ## 2. Pull Request の作成
+
+            プッシュが成功したら、GitHub CLI (`gh`) を使用してPRを作成します。
+
+            1. **環境変数のリセット**:
+               `gh` コマンドが内部の認証システムと干渉しないよう、コマンド実行時に `GITHUB_TOKEN` を一時的に無効化して実行します。
+            2. **PR作成コマンドの実行**:
+               タイトル(`--title`)と本文(`--body`)は**英語**で記述してください。本文には変更の概要、関連するイシュー、確認事項などを含めます。
+               ```bash
+               # bashを使用し、インラインで環境変数をクリアして実行する例
+               GITHUB_TOKEN= gh pr create --title "Feature: User Authentication" --body "## Description
+               Added the user authentication flow based on the specification.
+
+               ## Changes
+               - Implemented login component
+               - Added token validation
+               - Updated E2E tests"
+               ```
+
+            3. **作成結果の確認**:
+               コマンドが出力するPRのURLを確認し、作成が成功したことをユーザーに報告します。
+
+            ## 3. 追加改修の運用フロー (PRマージ前/後)
+
+            状況に応じて、以下の運用ルールに従って改修をコミット・PRします。
+
+            ### A. 対象のPRがまだオープン（マージ前）の場合
+            追加の改修やレビュー指摘の修正が必要になった場合は、**現在のブランチのまま**作業を続けます。
+            1. コードを修正
+            2. `git add` & `git commit`
+            3. `git push`
+            ※ すでにPRが作成されているため、`git push` するだけで自動的にオープン中のPRに追加・反映されます。新たにPRを作成する必要はありません。
+
+            ### B. 対象のPRがマージ済みの後に更なる改修が必要になった場合
+            マージ済みのブランチで作業を続けると、既存の変更を含んだ不要な差分が混じるため、**必ず新しいブランチを作成**して差分だけをPRします。
+            1. 最新の `main` (または `master`) を取得:
+               ```bash
+               git checkout main
+               git pull origin main
+               ```
+            2. 新しい作業ブランチを作成（例: `fix-auth-edge-cases`）:
+               ```bash
+               git checkout -b <新しいブランチ名>
+               ```
+            3. コードを修正（追加改修の差分のみ実装）
+            4. 本ワークフローの「1. コミットとプッシュ」と「2. Pull Request の作成」を再実施し、新しいPRを作成します。
+          description: Create a pull request from committed code changes and manage post-merge revisions.
+          id: create-pull-request
+          kind: procedure
+          selected: true
+          tags:
+            - baseline
+          title: Create Pull Request
+          trigger:
+            command: create-pull-request
+        - apiVersion: agent.meta/v1
+          body: "\n# 仕様書作成ワークフロー\n\nこのワークフローは、ユーザーが述べた内容を元に、構造化された仕様書 (`.../ideas/.../XXX-{Name}.md`) を作成します。\n\n## 1. 準備: ステータスとコンテキストの確認\n\n1.  **ステータスの取得**:\n    *   `scripts/utils/show_current_status.sh` を実行します。\n    *   JSON出力から `phase`, `branch`, `next_idea_id` を取得します。\n    *   以下、`[Phase]`, `[Branch]`, `[NextID]` とします。\n\n## 2. 出力先の決定\n\n1.  **ディレクトリの確定**:\n    *   基本パス: `prompts/phases/[Phase]/branches/[Branch]/ideas/`\n    *   例: `prompts/phases/001-webservices/branches/main/ideas/`\n    *   このディレクトリが存在しない場合は作成します。\n2.  **ファイル名の決定**:\n    *   形式: `[NextID]-[名前].md`\n    *   `[名前]` 部分は、仕様の内容を適切に表現する簡潔な名称を使用します（例: `Tokenizer`, `RateLimit-GlobalManagement`など）。\n\n## 3. 仕様書の内容構成\n\n仕様書には、以下の項目を最低限含める必要があります:\n\n1.  **背景 (Background)**:\n    *   なぜこの機能や変更が必要なのか。\n    *   現在の課題や問題点。\n    *   わかる範囲で記載します（不明な場合は省略可）。\n2.  **要件 (Requirements)**:\n    *   実現すべき機能や満たすべき条件。\n    *   具体的な振る舞いや制約事項。\n    *   必須要件と任意要件を明確に区別します。\n3.  **実現方針 (Implementation Approach)**:\n    *   どのような技術やアーキテクチャで実現するか。\n    *   主要なコンポーネントやモジュールの概要。\n    *   設計上の重要な決定事項。\n4.  **検証シナリオ (Verification Scenarios)**:\n    *   **重要 (Preserve Details)**: ユーザーが具体的な手順、条件、またはテストシナリオ（例: 「(1)○○して(2)××する」）を提示した場合は、**要約したり「要件」に丸め込んだりせず、ここにそのままの粒度で転記・整理してください。**\n    *   ここは「何をもって完了とするか」の具体的なイメージを共有する場所です。\n    *   形式: 番号付きリストでの時系列記述を推奨します。\n5.  **テスト項目 (Testing for the Requirements)**:\n    *   要件が実現されたと確認するための、**自動化された検証手順**を記載します。\n    *   **重要 (Mandatory Automated Verification)**:\n        *   手動確認（「画面を目視で確認」など）だけの計画は許可されません。\n        *   必ずプロジェクト標準のスクリプトを使用した検証コマンドを明記してください。\n    *   どの要件を、どのスクリプト/テストケースで検証するかを対比して記述します。\n    *   **ビルド・全体検証の書き方**:\n        *   **ビルド**: `scripts/process/build.sh` を記載します（全体ビルド＋単体テスト）。\n        *   **統合テスト**: `scripts/process/integration_test.sh` を記載しますが、**オプションなしでの実行を推奨しません**。以下のガイドラインに従ってください。\n    *   **`integration_test.sh` の実行戦略**:\n        *   オプションなしで実行すると全カテゴリの統合テストが長時間実行され、不安定なテストも含まれるため、開発中の検証には不向きです。全カテゴリ一括実行は Nightly build 等の用途に留めてください。\n        *   仕様書では、**影響範囲を分析した上で、`--categories` や `--specify` オプションを使った具体的な実行コマンドを複数記述する**こと。\n        *   利用可能なカテゴリ: `common`, `llm`, `taskengine`, `template`, `gui`\n        *   `--specify \"REGEX\"` で特定テストに絞り込むことも可能です。\n        *   記述例:\n            ```\n            ### ビルド・全体検証\n            \n            1. ビルド＋単体テスト:\n               scripts/process/build.sh\n            \n            2. バックエンド統合テスト（共通機能のリグレッション確認）:\n               scripts/process/integration_test.sh --categories \"common\"\n            \n            3. GUI 統合テスト（UI 変更の確認）:\n               scripts/process/integration_test.sh --categories \"gui\" --specify \"SettingsGear|MailPost\"\n            ```\n        *   仕様の影響範囲に応じて、実行するカテゴリと `--specify` の対象を適切に選定します。影響しないカテゴリは含めないでください。\n\n## 4. 仕様書の作成と保存\n\n1.  **ユーザーとの対話**:\n    *   ユーザーが述べた内容を注意深く聞き、必要に応じて質問して詳細を明確にします。\n    *   背景、要件、実現方針、**および具体的な検証シナリオ**の4つの観点で情報を整理します。\n    *   **警告**: ユーザーが具体的な手順（Scenario）を提示している場合、それを勝手に抽象的な「機能要件」だけに変換して手順を捨ててはいけません。必ず「検証シナリオ」として詳細を残してください。\n2.  **マークダウン形式での作成**:\n    *   見出し、リスト、テーブルなどを適切に使用して読みやすく構造化します。\n    *   コードサンプルやAPIの例があれば、コードブロックで記載します。\n    *   Mermaid図などを用いて、アーキテクチャや処理フローを視覚化することも推奨されます。\n3.  **ファイルの保存**:\n    *   決定したファイル名で、指定されたディレクトリにファイルを保存します。\n\n## 5. 完了確認\n\n1.  **内容のレビュー**:\n    *   作成した仕様書が、背景・要件・実現方針の観点をカバーしているか確認します。\n2.  **ドキュメントの Git コミット**:\n    *   作成・更新した仕様書ファイルを `git add` → `git commit` してください。\n    *   コミットメッセージ例: `docs: add specification XXX-Name`\n    *   修正が複数回あった場合は、最終版をまとめてコミットしても構いません。\n    ```bash\n    git add prompts/phases/[Phase]/branches/[Branch]/ideas/[ファイル名]\n    git commit -m 'docs: add specification XXX-Name'\n    ```\n3.  **ファイルパスの提示**:\n    *   作成したファイルへのリンクをユーザーに提示します。\n        * 「file://プロジェクトルートからの相対パス」を用いること\n    *   **フェーズ移行**: 次のステップ（実装計画の作成等）に進むのは、ユーザーが明示的に指示した場合のみです。勝手に `create-implementation-plan` に進まないでください。\n"
+          description: Create a structured specification document capturing background, requirements, and verification scenarios.
+          id: create-specification
+          kind: procedure
+          selected: true
+          tags:
+            - baseline
+          title: Create Specification
+          trigger:
+            command: create-specification
+        - apiVersion: agent.meta/v1
+          body: |4-
+            # 実装実行ワークフロー
+
+            実装計画書 (`.../plans/.../XXX.md`) に基づき、コーディングルールとテストルールを遵守して実装を行う。
+
+            ## 1. 入力とルールの確認
+
+            1.  **入力ファイルの特定**:
+                *   ユーザーが指定したファイル、または現在エディタで開いているファイルを「実装計画書」として扱う。
+            2.  **ルールの読み込み**:
+                *   `{{policy:coding-rules}}` (コーディングルール)
+                *   `{{policy:testing-rules}}` (テスト実施ルール)
+                *   `{{policy:logging-rules}}` (ログ記述ルール)
+
+            ## 2. 実装の実行
+
+            1.  **計画の読み込み**:
+                *   実装計画書の内容を読み、変更対象のファイルや具体的な変更内容を把握する。
+                *   計画が複数ファイルに分割されている場合は、すべての計画ファイルを確認する。
+            2.  **進捗の追跡**:
+                *   `[ ]` → `[/]` (進行中) → `[x]` (完了) でチェックボックスを更新する。
+            3.  **コーディング**:
+                *   計画書の手順に従ってコードを記述・修正する。
+                *   `{{policy:coding-rules}}` のスタイルや設計原則を厳守する。
+                *   `{{policy:logging-rules}}` のレベル基準に従い、DEBUG ログを積極的に挿入する。
+            4.  **こまめな Git コミット**:
+                *   各ステップ完了ごとに `git add` → `git commit` を実施する。
+                *   コミットルールの詳細は `instructions.md` の「Git 操作ルール」を参照。
+
+            ## 2.5 E2Eテストの実装
+
+            実装計画の Verification Plan に **E2E Tests** セクションがある場合、テスト実行の**前に**、E2Eテストコードを実装する。
+
+            > [!CAUTION]
+            > **「手動でコマンドを実行して動作確認する」ことは、E2Eテストコードの代替にはならない。**
+            > 手動確認で得られた知見は、必ずテストコードとして残し、リグレッションテストとして機能するようにすること。
+
+            1.  **既存インフラの確認**:
+                *   `tests/` 配下の既存E2Eテストファイルを確認し、ヘルパー関数を把握する。
+            2.  **E2Eテストコードの実装**:
+                *   実装計画の Verification Plan に記載されたE2Eテストケースをコードとして実装する。
+            3.  **コミット**:
+                *   `git add && git commit` でE2Eテストコードをコミットする。
+
+            ## 3. テストと検証
+
+            テスト実施の詳細ルール（実行順序、修正ループ、タイムアウト方針等）は `{{policy:testing-rules}}` を参照。
+
+            ### 3.1 テスト実施の順序
+
+            1.  **Build & Unit Test (必須)**:
+                *   `./scripts/process/build.sh` を実行する。
+                *   **失敗時は次のステップに進んではならない。**
+            2.  **統合テストの実施**:
+                *   Build 成功後のみ実行する。
+                *   `./scripts/process/integration_test.sh --categories "xxx"` で関連カテゴリを指定実行する。
+                *   **失敗時は testing-rules.md Section 3 の修正ループに従い修正する。**
+
+            ### 3.2 修正と再テスト
+
+            > [!CAUTION]
+            > **NEVER IGNORE FAILURES**: ビルドやテストの失敗を無視してタスクを完了させることは禁止。
+
+            修正ループの詳細手順は `{{policy:testing-rules}}` Section 3 を参照。
+            「後で直す」は禁止。その場で修正し、コミットする。
+
+
+            ### 3.3 遠方知識の記録 (Far-Knowledge Recording)
+
+            > [!CAUTION]
+            > **省略禁止**: git push の前に、このステップを**必ず**実行してください。
+            > 遠方知識に該当する変更がない場合でも、判定プロセスは実行し、
+            > 「no update」の報告を出してから次に進んでください。
+
+            全てのビルドとテストが成功し、コミットが完了した後、git push の**前に**、
+            **record-far-knowledge** スキルに従って遠方知識の記録を行ってください。
+
+            体系化・スキル化は別途 **systematize-far-knowledge** ワークフローで実施します。
+
+            ## 4. Git Push
+
+            全てのビルドとテストが成功した後、`git push` を実施する。
+            テストが失敗している状態ではプッシュしない。
+          description: Execute an approved implementation plan following TDD workflow with incremental commits and verification.
+          id: execute-implementation-plan
+          kind: procedure
+          selected: true
+          tags:
+            - baseline
+          title: Execute Implementation Plan
+          trigger:
+            command: execute-implementation-plan
+        - apiVersion: agent.meta/v1
+          body: |4
+            # 調査ワークフロー (Investigation)
+
+            このワークフローは、コードベースの調査・分析を行い、その結果をレポートとしてまとめます。
+            **コードの修正や変更は一切行いません。**
+
+            ## 目的
+
+            - バグの原因特定、設計の理解、依存関係の把握などの調査を体系的に実施する
+            - 調査結果を構造化されたレポートとしてまとめ、ユーザーに報告する
+            - コードベースに影響を与えず、読み取り専用で作業する
+
+            ## 制約事項
+
+            > [!CAUTION]
+            > - ソースコードの変更（追加・編集・削除）は**絶対に行わない**こと
+            > - `git commit`, `git push` などのリポジトリ変更操作は**禁止**
+            > - ビルドスクリプトや生成系コマンドの実行は**禁止**（ただし調査目的の読み取り系コマンドは可）
+
+            ### 許可される操作
+
+            - ファイルの閲覧・検索（grep, find, cat, head, tail 等）
+            - `git log`, `git blame`, `git diff`, `git show` 等の読み取り系Gitコマンド
+            - 既存のバイナリやコマンドの実行（現状把握のため。例: `--version`, `--help`, ステータス確認系）
+            - ログファイルの閲覧・分析
+            - `python -m pydoc`, `ruff check`, `mypy` 等の読み取り系Pythonツール
+            - 中間ファイルの出力（`tmp/` ディレクトリ以下のみ）
+
+            ### 禁止される操作
+
+            - ソースコード（`.py`, `.ts`, `.tsx`, `.css`, `.html` 等）の作成・編集・削除
+            - 設定ファイル（`.json`, `.yaml`, `.toml` 等）の作成・編集・削除
+            - 仕様書・実装計画書の作成・編集（`prompts/` 配下）
+            - `pip install`, `uv sync`, `npm run build` 等のビルド・依存解決コマンド
+            - テストの実行（`pytest`, `scripts/process/build.sh`, `scripts/process/integration_test.sh` 等）
+
+            ## 1. 調査の開始
+
+            1. **調査対象の確認**:
+                * ユーザーの依頼内容を正確に把握する。
+                * 調査の目的（バグの原因特定、設計理解、パフォーマンス分析など）を明確にする。
+                * 不明点がある場合は、調査前にユーザーに確認する。
+
+            2. **調査スコープの決定**:
+                * 調査対象のファイル、モジュール、機能を特定する。
+                * 必要に応じて、関連する仕様書（`prompts/phases/` 配下）や設計ドキュメントを参照する。
+
+            ## 2. 調査の実施
+
+            以下の手法を適宜組み合わせて調査を進める:
+
+            1. **コード解析**:
+                * ソースコードの閲覧と理解
+                * 関数・クラスの依存関係のトレース
+                * grep/ripgrep によるパターン検索
+                * `git blame` / `git log` による変更履歴の追跡
+
+            2. **ログ・出力の分析**:
+                * アプリケーションログの確認
+                * エラーメッセージやスタックトレースの分析
+                * 設定値の確認
+
+            3. **動的な現状把握**（必要に応じて）:
+                * 既存のコマンドやバイナリの実行によるバージョン・ステータス確認
+                * 環境変数や設定の確認
+                * プロセスやサービスの状態確認
+
+            4. **ドキュメント・仕様の参照**:
+                * 既存の仕様書（`prompts/phases/` 配下）の確認
+                * コード内のコメントや docstring の確認
+                * README や設計ドキュメントの確認
+
+            ## 3. レポートの作成
+
+            調査結果を Artifact としてレポートにまとめる。
+
+            ### レポートの構成
+
+            レポートには以下の項目を含める:
+
+            1. **調査概要 (Investigation Summary)**:
+                * 調査の目的と背景
+                * 調査対象のスコープ
+
+            2. **調査手法 (Methodology)**:
+                * 実施した調査の手法を簡潔に記載
+                * 使用したコマンドや検索パターンなど
+
+            3. **調査結果 (Findings)**:
+                * 発見した事実を構造化して記載
+                * コードスニペット、ログ抜粋、図表などを活用して分かりやすくまとめる
+                * ファイルパスへのリンクを含める
+
+            4. **分析・考察 (Analysis)**:
+                * 調査結果に基づく分析と考察
+                * 原因の推定や問題の構造の説明
+                * 関連する既知の問題や注意点
+
+            5. **推奨事項 (Recommendations)**（該当する場合）:
+                * 調査結果を踏まえた対応の提案
+                * 優先度の提示
+                * **注意**: ここでは方向性や方針の提案のみを行う。実際のコード変更は行わない。
+
+            ### レポートのフォーマット
+
+            - マークダウン形式で記述する
+            - コードスニペットはコードブロックで記載する
+            - ファイルパスへのリンクを含める（`file://` 形式）
+            - 必要に応じて Mermaid 図やテーブルを使用する
+
+            ## 4. 報告
+
+            1. **レポートの提示**:
+                * 作成したレポートをユーザーに提示する。
+                * 重要な発見事項がある場合は、レポートとは別にチャットでもハイライトする。
+
+            2. **フォローアップ**:
+                * ユーザーからの追加質問に対応する。
+                * 必要に応じて追加調査を実施する。
+                * 調査結果を受けて修正が必要な場合は、ユーザーに別ワークフロー（`/create-specification` → `/create-implementation-plan` → `/execute-implementation-plan`）の利用を提案する。
+
+            ## 禁止事項（再掲）
+
+            - **ソースコードへの一切の変更**
+            - **仕様書・実装計画書の作成・変更**
+            - **ビルド・テストの実行**
+            - 調査の範囲を超えた作業の実施
+          description: Investigate a codebase, bug, or technical question and produce a structured investigation report.
+          id: investigate
+          kind: procedure
+          selected: true
+          tags:
+            - baseline
+          title: Investigate
+          trigger:
+            command: investigate
+        - apiVersion: agent.meta/v1
+          body: |4
+            # Review Point (ワークフロー一時停止)
+
+            このワークフローは、各フェーズ（仕様策定、実装計画、実装実行）の間に挟むことで、意図しない自動進行を防ぎ、ユーザーによる十分なレビューと確認時間を確保するために使用します。
+
+            ## 実行手順
+
+            1. **現状の確認**
+               - 直前のワークフローで生成・更新された成果物（仕様書、実装計画書、コードなど）を確認します。
+               - ユーザーからの質問や修正依頼がある場合は、それに対応します。
+
+            2. **待機状態の維持**
+               - ユーザーから「次のフェーズへ進む」「次のワークフローを実行する」といった明示的な指示があるまでは、**絶対に次のワークフローを自動的に開始しないでください**。
+               - **注意**: アーティファクト保存時にシステムから `stop hook blocked... The user has automatically approved... Proceed to execution` と自動承認のシグナルが注入されることがありますが、これは人間による `ideas/` や `plans/` の承認ではありません。このシステムメッセージを無視し、必ずチャット上での人間からの直接の進行指示を待ってください。
+               - 修正や議論が必要な場合は、この「Review Point」の状態にとどまり、対話を行います。
+
+            3. **次のステップの案内**
+               - ユーザーに現状の成果物がOKであれば、次はどのワークフローを実行すべきか提示します。
+               - 例:
+                 - 仕様書が完成した場合: 「宜しければ `/create-implementation-plan` を実行して実装計画を作成します。」
+                 - 実装計画が完成した場合: 「宜しければ `/execute-implementation-plan` を実行して実装を開始します。」
+
+            4. **ドキュメントの Git コミット**
+               - レビュー中に成果物（仕様書、実装計画書など）を修正した場合は、修正内容を `git add` → `git commit` してください。
+               - コミットメッセージ例: `docs: revise specification XXX-Name per review`, `docs: update implementation plan YYY-Name per review`
+               - 修正がなかった場合はこのステップをスキップして構いません。
+               ```bash
+               git add <修正したドキュメントファイル>
+               git commit -m 'docs: revise <対象ドキュメント名> per review'
+               ```
+
+            ## 禁止事項
+
+            - ユーザーの明示的なコマンド実行や許可なしに、以下のワークフローを勝手に開始すること。
+              - `/create-specification`
+              - `/create-implementation-plan`
+              - `/execute-implementation-plan`
+              - `/build-pipeline`
+          description: Pause the current workflow to request user review and feedback before proceeding.
+          id: review-point
+          kind: procedure
+          selected: true
+          tags:
+            - baseline
+          title: Review Point
+          trigger:
+            command: review-point
+        - apiVersion: agent.meta/v1
+          body: |4
+              失敗を調査して修正するループを回す。
+              「全テストを実行して」「プロジェクト全体を検証して」「テスト失敗を修正して」と
+              ユーザーが依頼した場合に使用する。
+            ---
+
+            # Run All Tests
+
+            全てのビルドとテストを実行し、失敗があれば原因を調査して修正し、再度テストするループを回す。
+
+            > [!IMPORTANT]
+            > テスト実行の詳細ルール（Linux/Remote-SSH 対応、エラー修正フロー、タイムアウト方針等）は
+            > `{{policy:testing-rules}}` を参照すること。
+
+            ---
+
+            ## Phase 1: Full Build & Unit Test
+
+            プロジェクト全体のビルドと単体テストを実行する。
+            統合テストは最新のビルド成果物に対して行うため、**必ずこのフェーズを先に通す**。
+
+            // turbo
+            ./scripts/process/build.sh
+
+            - 失敗した場合 → エラーログを確認し修正 → `build.sh` を再実行
+            - 全て通過するまで繰り返す
+
+            ## Phase 2: 選択的実行プランの作成
+
+            `integration_test.sh` は全カテゴリを一括実行すると非常に長時間かかるため、**選択的実行プラン**を立ててカテゴリ単位で分割実行する。
+
+            ### 2.1 利用可能なカテゴリの発見
+
+            カテゴリは将来追加される可能性があるため、**決め打ちせず毎回動的に発見する**。
+
+            1. **ヘルプ出力を確認**:
+               ```bash
+               ./scripts/process/integration_test.sh --help
+               ```
+               `Available categories:` の行からカテゴリ一覧を取得する。
+
+            2. **バックエンドテストディレクトリを走査**:
+               ```bash
+               ls -d features/backend/tests/*/
+               ```
+               `testdata` 等のテスト非対象ディレクトリを除外する。
+
+            3. **フロントエンド（GUI）テストの有無を確認**:
+               `features/frontend/scripts/integration_test.sh` が存在すれば `gui` カテゴリも対象。
+
+            4. **カテゴリ実行順序の確認**:
+               `features/backend/scripts/integration_test.sh` 内の `GO_CATEGORY_ORDER` 配列から推奨順序を取得。
+
+            > **重要**: 常にこの動的発見の結果を使用すること。ワークフロー内のハードコードされたカテゴリ名は使わない。
+
+            ### 2.2 実行プランの策定
+
+            1. 発見した全カテゴリについて実行順序を決定する。
+            2. テストケースが多い場合は `--specify` で正規表現フィルタを使い分割する。
+
+            ```
+            実行プラン:
+            1. {category_a} : --categories "{category_a}"
+            2. {category_b} : --categories "{category_b}"
+            ...
+            N. gui          : --categories "gui"
+            ```
+
+            ## Phase 3: 選択的実行ループ
+
+            プランに沿って、各ステップを順番に実行する。
+
+            ```mermaid
+            flowchart TD
+                A["テスト実行"] --> B{完了?}
+                B -->|タイムアウト| C["--specify で絞り込み"]
+                C --> A
+                B -->|正常完了| D{全テスト通過?}
+                D -->|Yes| E[次のステップへ]
+                D -->|No| F[エラーログ確認]
+                F --> G{修正可能?}
+                G -->|Yes| H[コード修正]
+                H --> I["失敗テストのみ再実行"]
+                I --> J{通過?}
+                J -->|No| F
+                J -->|Yes| K["カテゴリ全体を再実行"]
+                K --> D
+                G -->|No| L[残存課題として記録]
+            ```
+
+            ### 修正時の注意事項
+
+            - 修正は最小限にとどめる。
+            - 修正完了時には `git commit` でこまめにコミットする。
+            - 修正後はまず `--specify` で失敗テストのみ再実行 → 通過後にカテゴリ全体を再実行。
+
+            ## Phase 4: 最終確認
+
+            全カテゴリのテストが通過したら、全体を通しで再確認する。
+
+            > **判断**: Phase 3 で修正が一切なかった場合、Phase 4 はスキップしてよい。
+            > 修正があった場合はリグレッション確認のため必ず実施する。
+
+            ## Phase 5: 結果レポート & Push
+
+            全フェーズ完了後、以下をユーザーに報告する:
+
+            - **ビルド結果**: 成功 / 失敗回数
+            - **テスト結果**: カテゴリごとの成功 / 失敗テスト数
+            - **修正内容**: 修正したファイルと変更の概要
+            - **残存課題**: 解決できなかった問題がある場合はその詳細
+
+            全テスト成功後に `git push` を実施する。失敗状態ではプッシュしない。
+          description: Run all project tests including build, unit, integration, and E2E tests with a repair loop for failures.
+          id: run-all-tests
+          kind: procedure
+          selected: true
+          tags:
+            - baseline
+          title: Run All Tests
+          trigger:
+            command: run-all-tests
+        - apiVersion: agent.meta/v1
+          body: |4
+            # 遠方知識の体系化ワークフロー
+
+            pending intake events を確認し、遠方知識をカテゴリ化・体系化・スキル化する。
+
+            ## 実行タイミング
+
+            ユーザーが明示的に指示した時に実行する。
+
+            ## 手順
+
+            ### Step 1: Pending Events の確認
+
+            ```bash
+            ./scripts/code/agent/intake.sh list --status pending
+            ```
+
+            pending events が 0 件の場合、以下を報告して終了する:
+
+            ```text
+            Far-knowledge systematization: no pending events. Skipping.
+            ```
+
+            ### Step 2: 既存カテゴリツリーの確認
+
+            ```bash
+            ./scripts/code/agent/knowledge.sh list
+            ```
+
+            ### Step 3: 各 Pending Event の分析
+
+            各 pending event について:
+
+            1. `./scripts/code/agent/intake.sh show <event-id>` で内容を確認
+            2. 距離判定を実施:
+               - この知識は、近傍コードを検索すれば得られるか? -> はいなら、スキップ
+               - この知識は、無関係なモジュールの開発時にも適用できるか? -> カテゴリ化対象
+            3. 既存カテゴリとの関連を判定
+
+            ### Step 4: カテゴリ判定と登録
+
+            各 event について:
+
+            **新規カテゴリが必要な場合:**
+
+            知識の内容をマークダウンファイルとして一時ファイルに書き出し、
+            `knowledge.sh add` でカテゴリを作成する:
+
+            ```bash
+            # 一時ファイルに知識内容を書き出す
+            cat > tmp/knowledge_content.md << 'EOF'
+            # Knowledge Title
+
+            Knowledge content extracted from the intake event...
+            EOF
+
+            ./scripts/code/agent/knowledge.sh add \
+              --category-path "<category-name>" \
+              --title "<knowledge-title>" \
+              --description "<category-description>" \
+              --content-file tmp/knowledge_content.md \
+              --source-events "<event-id>"
+            ```
+
+            **既存カテゴリに追記する場合:**
+
+            ```bash
+            ./scripts/code/agent/knowledge.sh append \
+              --category-path "<existing-category>" \
+              --title "<knowledge-title>" \
+              --content-file tmp/knowledge_content.md \
+              --source-events "<event-id>"
+            ```
+
+            ### Step 5: 再整理の判断
+
+            カテゴリが増えた場合、以下の基準で再整理を検討する:
+
+            1. **split が必要なとき**: 1つのカテゴリの知識ファイルが多すぎる(5件以上)、
+               または内容が2つ以上の明確に異なるサブトピックを含む場合
+            2. **merge が必要なとき**: 2つのカテゴリの知識が頻繁に相互参照され、
+               単独では不完全な場合
+            3. **rename が必要なとき**: カテゴリ名がその内容を正確に表現しなくなった場合
+            4. **move が必要なとき**: 特定の知識項目が現在のカテゴリよりも
+               別のカテゴリに強く関連する場合
+            5. **何もしない**: 上記のいずれにも該当しない場合
+
+            再整理が必要な場合は `knowledge.sh` の split/merge/rename/move を使用する。
+
+            ### Step 6: Processed への移行
+
+            処理済みの各 event を processed に移動する:
+
+            ```bash
+            ./scripts/code/agent/intake.sh processed <event-id>
+            ```
+
+            ### Step 7: スキル化の検討
+
+            カテゴリの内容をスキル化する。各カテゴリについて:
+
+            1. カテゴリの知識ファイルを確認
+            2. capability スキーマに変換:
+               - id には `__far-knowledge-` プレフィックスを付与
+               - `user_visible: false` を設定
+               - `manual_only: false` を設定
+               - `status: current` を設定
+            3. `prompts/memory/branches/<branch-package-id>/skills/<id>/SKILL.md` に配置
+               - 重要: `<id>/SKILL.md` のサブディレクトリ構造にすること (フラットファイル不可)
+               - `ScanBranchSkills()` がこの構造を期待する
+
+            配置例:
+
+            ```
+            prompts/memory/branches/BR-xxx/skills/
+              __far-knowledge-agent-record-branch-package/
+                SKILL.md
+              __far-knowledge-prompt-memory-architecture/
+                SKILL.md
+            ```
+
+            ### Step 8: デプロイ
+
+            ```bash
+            ./scripts/code/prompt/update.sh
+            ```
+
+            ### Step 9: 結果報告
+
+            以下の形式で報告する:
+
+            ```text
+            Far-knowledge systematization: completed.
+            - Processed events: <count>
+            - New categories: <list>
+            - Updated categories: <list>
+            - Reorganized: <details>
+            - Skills generated: <list>
+            - Deployed: yes/no
+            ```
+
+            ## 制約
+
+            - 本番コードの変更は行わない
+            - `prompts/memory/knowledge/` と `prompts/memory/branches/*/skills/` のみを変更対象とする
+            - 既存のユーザー管理スキル (`prompts/manifest/code_content/capabilities/`) は変更しない
+          description: Process pending intake events and compile far-knowledge into agent-readable skills.
+          id: systematize-far-knowledge
+          kind: procedure
+          selected: true
+          tags:
+            - baseline
+          title: Systematize Far-Knowledge
+          trigger:
+            command: systematize-far-knowledge
+        - apiVersion: agent.meta/v1
+          body: |4
+            # テスト実装計画作成ワークフロー
+
+            アイデア/仕様書 (`.../ideas/.../XXX-{Name}.md`) を元に、**要件ごとの実現性を検証するためのテスト実装計画書** (`.../plans/.../YYY-{Name}-TestPlan.md`) を作成する。
+
+            `/create-implementation-plan` が機能実装の計画を立てるのに対し、このワークフローは「最低限の実装で要件が実現できたと言い切れるか」を検証するためのテストに特化した計画を立てる。
+
+            ## 1. 入力とルールの確認
+
+            1.  **入力ファイルの特定**:
+                *   ユーザーが指定したファイル、または現在エディタで開いているファイルを「仕様書」として扱う。
+            2.  **ルールの読み込み**:
+                *   `{{policy:testing-rules}}` を読み込む。
+            3.  **ステータスの取得**:
+                *   `scripts/utils/show_current_status.sh` を実行し、`phase`, `branch`, `next_plan_id` を取得する。
+
+            ## 2. 出力先の決定
+
+            *   **出力ディレクトリ**: `prompts/phases/[Phase]/branches/[Branch]/plans/`
+            *   **ファイル名**: `[NextID]-[名前]-TestPlan.md` (`-TestPlan` で通常の実装計画書と区別)
+
+            ## 3. 仕様書の分析
+
+            仕様書を精読し、背景・目的、アーキテクチャ、データフロー、外部依存関係、既存コードとの統合ポイントを把握する。
+
+            ## 4. 要件の抽出
+
+            仕様書から**全ての要件**を漏れなく抽出し、番号付きリストとして整理する。
+
+            *   各要件に一意の識別子を付与する（例: `REQ-001`, `REQ-002`）。
+            *   分類: **機能要件** / **非機能要件** / **統合要件**
+            *   仕様書に明示されていない暗黙的な要件（エラーハンドリング、ログ出力等）も抽出する。
+
+            ## 5. 実現根拠の列挙
+
+            各要件について、「この要件が実現できたと言い切れる根拠」を**複数**列挙する。
+
+            > [!IMPORTANT]
+            > 「テストが通ること」ではなく、「何がどう観測・計測できること」が根拠になるかを明確にすること。
+
+            ## 6. 確認手段の列挙
+
+            各根拠について、「その根拠を得るために具体的にやるべきこと」を以下の視点から網羅的に列挙する:
+
+            | 視点 | 例 |
+            | :--- | :--- |
+            | ログ確認 | 特定のログレベル・メッセージが出力されること |
+            | API応答確認 | HTTPステータスコード・ボディの検証 |
+            | ファイル出力確認 | 生成ファイルの存在・内容の検証 |
+            | プロセス確認 | プロセスの起動・稼働・停止 |
+            | 通信確認 | コンポーネント間通信の実行確認 |
+            | データ確認 | 内部状態が期待通りに更新されること |
+            | エラー確認 | 異常系の適切なハンドリング |
+
+            ## 7. 確認手順の具体化
+
+            各確認手段について、**別の開発者がそのまま実行できるレベル**の詳細な手順を記述する。
+
+            各手順に含めるべき項目: **前提条件** / **入力** / **操作手順** / **期待結果** / **判定基準**
+
+            ## 8. テストシナリオへの変換
+
+            確認手順をテスト種別に分類し、実装計画としてまとめる。
+            テスト種別の配置先やファイル命名規則は `{{policy:testing-rules}}` Section 4 を参照。
+
+            テストケースの記述形式:
+
+            ```markdown
+            #### TC-XXX: [テストケース名]
+
+            *   **対応要件**: REQ-XXX
+            *   **対応根拠**: [根拠の参照]
+            *   **テスト種別**: 単体テスト / 統合テスト / E2Eテスト
+            *   **配置先**: [ファイルパス]
+            *   **テスト関数名**: `TestXxx_Yyy`
+            *   **テストシナリオ**:
+                1. [Arrange] テストデータの準備
+                2. [Act] テスト対象の実行
+                3. [Assert] 期待結果の検証
+            *   **実装メモ**: [モック対象、ヘルパー関数など]
+            ```
+
+            ## 9. テンプレート
+
+            ---
+            ### Template Start
+            ```markdown
+            # [ファイル名 (拡張子なし)]
+
+            > **Source Specification**: [仕様書の相対パス]
+
+            ## Goal Description
+            [テスト実装計画の目的]
+
+            ## User Review Required
+            [ユーザーの確認が必要な事項。なければ "None."]
+
+            ---
+
+            ## 1. 要件一覧 (Extracted Requirements)
+
+            | ID | 要件 | 分類 |
+            | :--- | :--- | :--- |
+            | REQ-001 | [要件の記述] | 機能 / 非機能 / 統合 |
+
+            ---
+
+            ## 2. 要件別 実現根拠と検証設計
+
+            ### REQ-001: [要件名]
+
+            #### 2.1 実現根拠 (Evidence of Fulfillment)
+            1.  **[E-001-1]**: [具体的な根拠]
+            2.  **[E-001-2]**: [具体的な根拠]
+
+            #### 2.2 確認手段 (Verification Methods)
+
+            | 根拠ID | 確認の視点 | 確認手段 |
+            | :--- | :--- | :--- |
+            | E-001-1 | ログ確認 | [具体的な確認手段] |
+
+            #### 2.3 確認手順 (Detailed Procedures)
+
+            ##### E-001-1: [根拠の要約]
+            1.  **前提条件**: ...
+            2.  **入力**: ...
+            3.  **操作手順**: ...
+            4.  **期待結果**: ...
+            5.  **判定基準**: ...
+
+            #### 2.4 テストシナリオ (Test Scenarios)
+
+            ##### TC-001: [テストケース名]
+            *   **対応要件**: REQ-001
+            *   **対応根拠**: E-001-1, E-001-2
+            *   **テスト種別**: ...
+            *   **配置先**: [ファイルパス]
+            *   **テスト関数名**: `TestXxx_Yyy`
+            *   **テストシナリオ**:
+                1.  [Arrange] ...
+                2.  [Act] ...
+                3.  [Assert] ...
+
+            ---
+
+            ## 3. テスト実装サマリー
+
+            ### テストケース一覧
+
+            | TC-ID | テストケース名 | 対応要件 | テスト種別 | 配置先 |
+            | :--- | :--- | :--- | :--- | :--- |
+            | TC-001 | ... | REQ-001 | ... | ... |
+
+            ### 要件カバレッジマトリクス
+
+            | 要件 | 単体テスト | 統合テスト | E2Eテスト | カバー状態 |
+            | :--- | :--- | :--- | :--- | :--- |
+            | REQ-001 | TC-001 | TC-002 | - | 完全 |
+
+            ---
+
+            ## 4. Step-by-Step Implementation Guide
+
+            1.  **[ステップ名]**:
+                *   [ ] Create/Edit `[ファイルパス]`
+                *   [具体的な実装内容]
+
+            ---
+
+            ## 5. Verification Plan
+
+            ビルドとテスト実行の手順。
+            テスト実行コマンドの詳細は `{{policy:testing-rules}}` Section 1 を参照。
+
+            1.  **Build & Unit Tests**: `./scripts/process/build.sh`
+            2.  **統合テスト**: `./scripts/process/integration_test.sh --categories "[category]" --specify "[対象]"`
+            3.  **全テスト実行**: `./scripts/process/integration_test.sh --categories "[category]"`
+            ```
+            ### Template End
+            ---
+
+            ## 10. セルフレビューと完了確認
+
+            1.  **要件網羅性**: 仕様書の全要件が抽出されているか。暗黙的な要件も含まれているか。
+            2.  **根拠の十分性**: 各要件に複数の根拠が列挙されているか。観測可能な事象が根拠になっているか。
+            3.  **確認手段の多角性**: Section 6 の視点一覧を参照し、該当する視点を漏れなくカバーしているか。
+            4.  **手順の具体性**: 各確認手順が「別の開発者がそのまま実行できるレベル」の詳細さを持っているか。
+            5.  **テスト分類の妥当性**: テスト種別の分類が適切か。
+            6.  **カバレッジの確認**: 要件カバレッジマトリクスに空白がある場合、その理由が妥当か。
+            7.  **`/execute-implementation-plan` との互換性**: チェックボックス付きの実装ガイドが含まれているか。
+
+            ## 11. ファイルの保存と完了
+
+            1.  作成したファイルを指定されたディレクトリに保存する。
+            2.  作成したファイルへのリンクをユーザーに提示する（`file://` 形式）。
+            3.  **フェーズ移行禁止**: 次のステップに進むのは、ユーザーが明示的に指示した場合のみ。
+          description: Generate test implementation plans based on specifications and existing test infrastructure.
+          id: test-generator
+          kind: procedure
+          selected: true
+          tags:
+            - baseline
+          title: Test Generator
+          trigger:
+            command: test-generator
+    skip:
+        - activation:
+            mode: always
+          apiVersion: agent.meta/v1
+          body: "# \U0001F916 Vibe Coding 標準 (2026年6月4日版)\n\n## 1 理念と目的\n\n### 1.1 Vibe Codingとは\n\nVibe Codingとは、**生成AI (LLM)** を単なるコードジェネレーターとしてではなく、アイデアの壁打ち相手、知識の整理係、そして実装パートナーとして活用し、人間とAIが協調しながら開発を進める手法です。\n\nこの標準は、**プロンプトを体系的にファイル化し管理する**ことで、AIが持つコンテキストの限界を超え、開発のどの段階においても一貫性、品質、効率を最大化することを目的とします。\n\n### 1.2 役割分担\n\n| **役割** | **人間（開発者）の責任** | **AI（LLM）の責任** |\n| ----- | ----- | ----- |\n| **戦略と判断** | プロジェクトのビジョン、技術選定、アーキテクチャの最終判断、法的・倫理的チェック。 | 計画と設計の提案、技術的選択肢の提示。 |\n| **コンテキスト管理** | ルール、アイデア、計画を**ファイルとして作成・更新・参照**する（プロンプトマネジメント）。 | 参照されたファイルに基づき、**常に最新かつ一貫したコンテキスト**を維持し、タスクを実行する。 |\n| **品質保証** | AIが生成したコードの最終レビュー、重要なセキュリティ/性能検証。 | 要求に基づくコード生成、対応する単体テストコードの作成、ルールの遵守。 |\n\n-----\n\n## 2 フォルダ構成の全体像\n\nプロンプトは、フェーズに依存しない共通知識と、フェーズごとの変動履歴の2つに大別し、以下の階層構造で管理します。\n\n```\n├── prompts/\n│   ├── specifications/                  # [フェーズ非依存] プロジェクト全体の最新仕様書\n│   ├── manifest/                        # [フェーズ非依存] ポリシー・プロシージャ・スキルの IR 定義\n│   │   ├── code_content/policies/         # コーディング規約、テストルール等\n│   │   ├── code_content/procedures/       # ワークフロー定義\n│   │   └── targets/                       # ターゲット固有のパス設定\n│   ├── memory/                          # [フェーズ非依存] アーキテクチャメモリ\n│   ├── refs/                            # [フェーズ非依存] プロジェクト全体で共通の参考資料\n│   │   └── global-apis.md               # 例: API定義\n│   └── phases/                          # [フェーズ依存] 開発フェーズごとの履歴とプロンプト\n│       └── {nnn}-{phase_name}/          # 例: 001-prototype (アクティブな開発フェーズ)\n│           ├── branches/                # ブランチ別のアイデアと計画\n│           │   └── {branch_id}/         # 例: main\n│           │       ├── ideas/           # アイデア、要件定義 (What)\n│           │       │   └── 000-FirstIdea.md\n│           │       └── plans/           # 開発計画、タスク定義 (How - Plan)\n│           │           └── 000-FirstPlan.md\n│           ├── designs/                 # 設計ドキュメント、構造定義 (Structure) 【任意】\n│           └── refs/                    # フェーズ固有の参考資料 【任意】\n```\n\n-----\n\n## 3 グローバル知識の管理（フェーズ非依存の知識）\n\nこれらのフォルダは、特定の開発フェーズに紐づかず、**プロジェクト全体を通じて役割とパスが固定されます**。内容（ファイルの中身）は必要に応じて随時アップデートされます。\n\n### 3.1 ポリシー管理（manifest の policies）\n\n**目的:** Vibe Codingのプロセス自体を規定する**メタ・ルール**と、コード生成の品質を規定する**実務ルール**の両方を管理し、AIの出力の一貫性、品質、セキュリティを保証します。ルールは manifest の `policies/` 配下で IR ファイルとして管理され、コンパイラによりターゲット固有のパスに展開されます。\n\n| **ルールの種類** | **IRファイル例** | **記述すべき項目** |\n| ----- | ----- | ----- |\n| **メタ・ルール** | **`vibe-coding-standard.md`** | **このドキュメント自体**。開発プロセス、ファイル命名規則、役割分担など。 |\n| **共通ルール (Always)** | **`coding-rules.md`** | **ビルドとテスト方針**（TDDの強制、カバレッジ目標）、**コーディング規約**（命名規則、ファイル構成）、**エラーハンドリング**など。**常にAIに適用させるべき最低限の実務ルール。** |\n| **シーン別ルール (Scenario)** | **`planning-rules.md`** / **`testing-rules.md`** | **特定のタスク**（例: 計画策定、テスト実装）にのみ適用する詳細な実務規約。 |\n\n**運用:**\n\n1.  **共通ルールの設定:** `activation.mode: always` のポリシーはコンパイル時に自動的に `.agent/rules/instructions.md` に統合され、常にAIに適用されます。\n2.  **シーン別ルールの適用:** `activation.mode: manual` のポリシーは個別のファイルとして展開され、ワークフロー内のテンプレート参照 (`{{policy:testing-rules}}` 等) で必要時に読み込まれます。\n3.  **注意:** AIの出力がルールを無視した場合、該当するルールファイルを改めて参照させ、再検討を依頼します。\n\n### 3.2 `prompts/refs/` の利用（共通参照資料の永続的なパス）\n\n**目的:** 複数のフェーズをまたいで参照される、プロジェクト固有の共通知識を保存します。\n\n| **内容例** | **記述すべき項目** |\n| **`global-apis.md`** | プロジェクトが利用する外部APIの仕様概要、認証フローなど。 |\n| **`common-utilities.ts`** | 全体で共通して利用されるヘルパー関数やカスタムユーティリティコード。 |\n\n**運用:**\n\n- AIへの依頼時、このフォルダ内のファイルを**明示的に参照**させることで、AIはプロジェクト全体にわたる知識に基づいてタスクを実行できます。\n\n-----\n\n## 4 開発フェーズの管理（フェーズ依存の知識）\n\n### 4.1 フェーズフォルダの命名と切り替え\n\n**命名規則:** `{nnn}-{phase_name}` (例: `001-prototype`)\n\n- **切り替え:** 現行フェーズの開発が完了したら、`phases/`直下に**連番を上げた新しいフェーズフォルダ**を作成します。\n- **履歴の保持:** 古いフェーズフォルダは移動させず、そのまま残します。これにより、以前の議論や決定事項が履歴として完全に保持され、パスも不変となります。\n\n### 4.2 フェーズ内のサブフォルダとプロセス (概要)\n\n| **フォルダ** | **役割** | **サマリー（目的と主なアクション）** |\n| ----- | ----- | ----- |\n| **ideas/** | **要件定義 (What)** | AIとの壁打ち結果をMarkdown化し、要件、ビジョン、機能を定義する最上位のコンテキスト。 |\n| **plans/** | **開発計画 (How)** | `ideas/`を参照させ、具体的なタスク、工程を生成。TDDを推奨し、計画変更時は必ず`ideas/`から修正する。 |\n| **designs/** | **構造定義 (Structure)** | **【任意】** AIにMermaidなどで構造図を作成させ、複雑な仕様における人間とAIの相互理解を深める。 |\n| **refs/** | **固有の参考資料** | **【任意】** そのフェーズでのみ必要な一時的なコード片やテストデータなどを格納し、タスク実行時に参照する。 |\n\n### 4.3 フェーズ内フォルダごとの詳細な手順\n\n#### 4.3.1 `ideas/` (アイデア・要件定義)\n\n**目的:** 開発したいものの**要件、ビジョン、機能**を定義します。AIとの壁打ちの「種」となる最上位のコンテキストです。\n\n**手順:**\n\n1.  **壁打ち:** ChatGPTやGeminiなどのAIと対話し、アイデアの具体化、実現可能性の検討、機能の洗い出しを行います。\n2.  **ファイル化:** 十分に議論した後、その結果を**Markdown形式で整理**し、要件定義とします。\n3.  **命名:** `{mmm}-{title}.md`の規則に従って`branches/{branch_id}/ideas/`内に保存します。\n\n#### 4.3.2 `plans/` (開発計画)\n\n**目的:** アイデアを実現するための**具体的なタスク、工程、マイルストーン**を定義し、実行の指針とします。\n\n**手順:**\n\n1.  **計画の生成:** `ideas/`内のファイルを参照させ、「このアイデアを実現するための計画を作成してください」とAIに依頼します。空の計画ファイルを作成し、その中に記述させるのが効率的です。\n2.  **実行前のコミット:** **コード生成を含む計画を実行する直前**に、現在のプロジェクトの状態をGitにコミットします。これにより、AIによる大規模な改変や意図しない変更が発生した場合でも、即座に安全な状態へロールバックできます。\n3.  **実現可能性の検討:** 生成された計画を人間が確認し、技術的、時間的に実現可能か評価します。\n4.  **計画の実行:** 承認された計画ファイルを参照させ、「この計画の最初のステップを実行してください」と依頼します。\n\n**計画のアップデート:**\n\n- 計画から漏れや変更が見つかった場合、**まず`ideas/`の要件を修正**してから、そのファイルを指定して計画の更新を依頼します。\n- チャットメッセージでの軽微な修正依頼は、コンテキストとして残りづらいため極力避けます。\n\n#### 4.3.3 `designs/` (設計ドキュメント)\n\n**目的:** **【任意】** コードの複雑化や規模拡大に伴い、AIと人間の相互理解を深めるため、システム構造や処理フローを図やドキュメントとして記録します。\n\n**活用方法:**\n\n- **AIへの依頼:** 開発中のコードベースや計画を参照させ、「現在のシステムの設計概要（処理フロー図、クラス図など）をMarkdownまたはMermaid形式で作成してください」と依頼し、`designs/`に保存します。\n- **コンテキストの参照:** 新しい計画を作成する際や、既存コードを修正する際に、AIにこの設計ファイルを参照させ、現状の構造を正しく把握させます。\n\n#### 4.3.4 `refs/` (フェーズ固有の参考資料)\n\n**目的:** **【任意】** そのフェーズのタスクにのみ必要な**一時的・固有の知識**（例: 特定のコードスニペット、一時的なテストデータ、外部仕様の一部）を保存します。\n\n**活用方法:**\n\n- プロジェクト全体で共有すべきでない、または一時的な参照にのみ使用するファイルを格納し、必要なタスク実行時にAIに参照させます。\n\n-----\n\n## 5 ファイル命名規則とパス管理\n\n### 5.1 プロンプトファイルの命名規則\n\nすべてのプロンプトファイルは、以下の規則に従い、**ブランチ**ごとに**時系列**を識別できるようにします。\n\n> **`branches/{branch_id}/{ideas|plans}/{mmm}-{title}.md`**\n\n- **`{branch_id}` (ブランチ識別子):** 現在作業中のGitブランチ名の簡略形（例: `feat-login`, `bug-001`）。衝突回避を目的とします。\n- **`{mmm}` (ファイル連番):** 3桁の連番（例: `001`）。各ブランチ内での作成順を示します。\n- **`{title}`:** 内容を簡潔に表すタイトル（例: `initial-api-reqs`）。\n\n### 5.2 ファイル参照の標準\n\n**パスの永続性**はVibe Coding標準の核心です。\n\n1.  **AIへの指示:** AIへの依頼時には、以下の手法に基づき、参照パスを指定すること。\n\n  - **IDE及びGUIベースの環境 (VSCode, Cursor等):** ファイルをメッセージフォームへ**ドラッグ＆ドロップ**するか、`@`による**逐次的検索**を通じて、相対パスを生成すること。\n  - **CLIベースの環境 (Claude Code等):** **現在アクティブなフェーズフォルダ内を起点とする相対パス**を、手動でメッセージ内に直接記述すること。\n  - **例:** `./branches/feat-login/ideas/001-initial-api-reqs.md`\n\n2.  **文脈の保持:** この方法により、チャット履歴が流れても、AIは参照されたファイルから常に正確なコンテキストを読み込み、一貫した出力を維持できます。\n\n### 5.3 Gitと連携した運用\n\n- **ファイルのコミット:** `ideas/`, `plans/`, `designs/`内のプロンプトファイルは、コードファイルと同様にGitでバージョン管理し、コミットメッセージで変更内容を明確に記録します。\n- **ブランチID:** ファイル名にブランチIDを含めることで、どのブランチで議論・計画されたプロンプトであるかを一目で識別できます。"
+          id: vibe-coding-standard
+          kind: skip
+          scope: project
+          selected: true
+          tags:
+            - baseline
+          title: Vibe Coding Standard
+    target:
+        - apiVersion: agent.meta/v1
+          id: antigravity
+          includes:
+            capability: true
+            policy: true
+            procedure: true
+            subagent: false
+          kind: target
+          limits:
+            rules:
+                max_file_size: 12000
+                on_exceed: warn
+          paths:
+            rules: .agent/rules/
+            skills: .agent/skills/
+            workflows: .agent/workflows/
+          selected: true
+        - apiVersion: agent.meta/v1
+          id: claude-code
+          includes:
+            capability: true
+            policy: true
+            procedure: true
+            subagent: false
+          kind: target
+          paths:
+            rules: .claude/rules/
+            skills: .claude/skills/
+          selected: true
+        - apiVersion: agent.meta/v1
+          id: codex
+          includes:
+            capability: true
+            policy: true
+            procedure: true
+            subagent: false
+          index_file: CODEX.md
+          kind: target
+          paths:
+            rules: .codex/rules/
+            skills: .codex/skills/
+          selected: true
+        - apiVersion: agent.meta/v1
+          id: cursor
+          includes:
+            capability: true
+            policy: true
+            procedure: true
+            subagent: false
+          kind: target
+          paths:
+            rules: .cursor/rules/
+            skills: .cursor/skills/
+          selected: true
+    worker:
+        - apiVersion: agent.meta/v1
+          capability: manifest_verification
+          description: Specialized worker to verify consistency between manifest and codebase.
+          id: verifier
+          kind: worker
+          selected: true
+          title: Verifier Worker
+memory_docs: []
