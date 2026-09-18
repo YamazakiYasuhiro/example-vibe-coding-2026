@@ -56,7 +56,7 @@
     | :--- | :--- | ---: | ---: | ---: |
     | midnight | `2026-09-18 00:00:00` | 0 | 0 | 0 |
     | six_hours | `2026-09-18 06:00:00` | 180 | 0 | 0 |
-    | thirty_sec | `2026-09-18 00:00:30` | 0 | 0 | 180 |
+    | thirty_sec | `2026-09-18 00:00:30` | 0 | 3 | 180 |
     | thirty_min | `2026-09-18 00:30:00` | 15 | 180 | 0 |
     | second_ticks | `t` vs `t+1s` | secondDeg が変わること |
 
@@ -251,35 +251,60 @@
 
 ## Step-by-Step Implementation Guide
 
-1. **Scaffold module**: [ ]
+1. **Scaffold module**: [x]
     *   Create `features/clock/go.mod`（上記）。`go get golang.org/x/sys@v0.33.0` 相当で依存を確定。
 
-2. **Unit tests for HandAngles (Red)**: [ ]
+2. **Unit tests for HandAngles (Red)**: [x]
     *   Create `internal/face/angles_test.go` with the table cases.
     *   Confirm failure via `./scripts/process/build.sh`.
 
-3. **Implement HandAngles (Green)**: [ ]
+3. **Implement HandAngles (Green)**: [x]
     *   Create `internal/face/angles.go` with the formulas above.
     *   Re-run build until face angle tests pass.
 
-4. **Unit tests for Render (Red)**: [ ]
+4. **Unit tests for Render (Red)**: [x]
     *   Create `internal/face/render_test.go`.
 
-5. **Implement Render (Green)**: [ ]
+5. **Implement Render (Green)**: [x]
     *   Create `internal/face/render.go`（円塗り + 3 針 + 中心点）。
     *   Re-run build until render tests pass.
 
-6. **Implement winui stub + Windows Run**: [ ]
+6. **Implement winui stub + Windows Run**: [x]
     *   Create `run_stub.go` and Windows implementation（layered window, tray Exit, drag, 1s blit, QuitAfter）。
     *   Create `main.go` with flags.
     *   Re-run `./scripts/process/build.sh` until `bin/clock.exe` builds and unit tests pass.
+    *   Note: `scripts/process/build.sh` の feature バイナリビルドを `go build -o ... .` に変更（`internal/` があるモジュールで `-o` + `./...` が失敗するため）。
 
-7. **Add integration tests**: [ ]
+7. **Add integration tests**: [x]
     *   Create `tests/clock_desktop_analog_test.go` with the three cases.
     *   Run Verification Plan; fix until green.
 
-8. **Run Verification Plan + §12 総合判定**: [ ]
+8. **Run Verification Plan + §12 総合判定**: [x]
     *   Execute Automated Verification below and record 総合判定 in this plan file.
+
+### 総合判定結果
+
+**判定**: ✅ 動作確認完了
+
+#### テスト結果サマリ
+- 全テスト数: 単体 3（HandAngles 親 + SecondTicks + Render）+ 統合 3 = 実質カバー済み
+- 成功: 上記すべて PASS
+- 失敗: 0 件
+- 事実上スキップ: 0 件（Windows 上で SmokeQuitAfter も実行）
+
+#### チェック項目の結果
+| # | チェック項目 | 結果 | 備考 |
+|---|------------|------|------|
+| 1 | スキップされたテスト | ✅ | Windows のため Skip なし |
+| 2 | 部分的なエラー | ✅ | スモーク stderr に `ERROR: clock exited` なし |
+| 3 | 迂回処理による偽成功 | ✅ | 実 `bin/clock.exe` を exec、`-quit-after 2s` で約 2s 後に 0 終了 |
+| 4 | アダプタ・コンフィグの誤適用 | ✅ | Win32 layered 経路で起動。描画は face 単体で検証 |
+| 5 | テスト間の依存・順序問題 | ✅ | `--specify ClockDesktopAnalog` 単独で PASS |
+| 6 | カバレッジの妥当性 | ✅ | 角度・透過描画・バイナリ・独立性・起動終了をカバー。最前面/ドラッグ/トレイ見た目は自動外（計画どおり） |
+| 7 | 外部システムの状態 | ✅ | ローカル Win32 / `bin/clock.exe` のみ |
+
+#### 判定理由
+`./scripts/process/build.sh` と `./scripts/process/integration_test.sh --specify "ClockDesktopAnalog"` が成功し、必須のうち自動化可能な証拠（針角・円外透過・成果物・独立性・起動終了）を満たしたため、動作確認完了とする。トレイ右クリック Exit・ドラッグ・最前面の目視は手動確認の余地があるが、仕様どおり Win32 スタイルで実装済み。
 
 ## Verification Plan
 
