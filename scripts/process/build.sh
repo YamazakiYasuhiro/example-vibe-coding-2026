@@ -130,7 +130,9 @@ build_go() {
         goexe="$(go env GOEXE)"
         local out_bin="$PROJECT_ROOT/bin/${feature_name}${goexe}"
         info "Building $feature_name..."
-        if go build -o "$out_bin" ./...; then
+        # Build the feature root package (main). Use "." not "./..." so -o works
+        # when the module also contains internal/ library packages.
+        if go build -o "$out_bin" .; then
             success "Build succeeded for $feature_name → bin/${feature_name}${goexe}"
         else
             fail "Build failed for $feature_name."
